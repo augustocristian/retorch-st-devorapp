@@ -1,0 +1,121 @@
+{
+  "web-browser": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelWebBrowser",
+      "elasticity": 5,
+      "elasticityCost": 30.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "web-browser",
+    "minimalCapacities": [
+      {"name": "memory",    "quantity": 0.048},
+      {"name": "processor", "quantity": 0.25},
+      {"name": "storage",   "quantity": 0.31}
+    ],
+    "dockerImage": "web-browser;eexit/mirror-http-server"
+  },
+  "frontend": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelFrontend",
+      "elasticity": 4,
+      "elasticityCost": 10.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "frontend",
+    "minimalCapacities": [
+      {"name": "memory",    "quantity": 0.048},
+      {"name": "processor", "quantity": 0.25},
+      {"name": "storage",   "quantity": 0.31}
+    ],
+    "dockerImage": "frontend;eexit/mirror-http-server"
+  },
+  "user": {
+    "hierarchyParent": [],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelUser",
+      "elasticity": 5,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "user",
+    "minimalCapacities": [
+      {"name": "memory",    "quantity": 0.048},
+      {"name": "processor", "quantity": 0.25},
+      {"name": "storage",   "quantity": 0.31}
+    ],
+    "dockerImage": "user;eexit/mirror-http-server"
+  },
+  "favoritos": {
+    "hierarchyParent": ["devorappdb"],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelFavoritos",
+      "elasticity": 5,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "favoritos",
+    "minimalCapacities": [
+      {"name": "memory",    "quantity": 0.048},
+      {"name": "processor", "quantity": 0.25},
+      {"name": "storage",   "quantity": 0.31}
+    ],
+    "dockerImage": "favoritos;eexit/mirror-http-server"
+  },
+  "historial": {
+    "hierarchyParent": ["devorappdb"],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelHistorial",
+      "elasticity": 5,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "historial",
+    "minimalCapacities": [
+      {"name": "memory",    "quantity": 0.048},
+      {"name": "processor", "quantity": 0.25},
+      {"name": "storage",   "quantity": 0.31}
+    ],
+    "dockerImage": "historial;eexit/mirror-http-server"
+  },
+  "mas-tarde": {
+    "hierarchyParent": ["devorappdb"],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelMasTarde",
+      "elasticity": 5,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "mas-tarde",
+    "minimalCapacities": [
+      {"name": "memory",    "quantity": 0.048},
+      {"name": "processor", "quantity": 0.25},
+      {"name": "storage",   "quantity": 0.31}
+    ],
+    "dockerImage": "mas-tarde;eexit/mirror-http-server"
+  },
+  "valoraciones": {
+    "hierarchyParent": ["devorappdb"],
+    "replaceable": [],
+    "elasticityModel": {
+      "elasticityID": "elasModelValoraciones",
+      "elasticity": 5,
+      "elasticityCost": 5.0
+    },
+    "resourceType": "LOGICAL",
+    "resourceID": "valoraciones",
+    "minimalCapacities": [
+      {"name": "memory",    "quantity": 0.048},
+      {"name": "processor", "quantity": 0.25},
+      {"name": "storage",   "quantity": 0.31}
+    ],
+    "dockerImage": "valoraciones;eexit/mirror-http-server"
+  }
+}
