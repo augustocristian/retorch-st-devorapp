@@ -10,4 +10,4 @@ TESTS-TestSuites.xml
 org.sonarlint.eclipse.core.prefs
 
 # Cloned sut
-.devorapp
+/devorapp
