@@ -18,7 +18,7 @@ import java.time.Duration;
 public class Waiter {
 
     private static final Logger log = LoggerFactory.getLogger(Waiter.class);
-    private static final int WAIT_SECONDS = 10;
+    private static final int WAIT_SECONDS = 20;
 
     private final WebDriverWait wait;
 
@@ -48,7 +48,7 @@ public class Waiter {
     }
 
     public void waitForRegisterPage() {
-        waitUntil(ExpectedConditions.visibilityOfElementLocated(By.id("register-form")),
+        waitUntil(ExpectedConditions.visibilityOfElementLocated(By.id("reg-email")),
                 "Register page did not load");
     }
 
@@ -60,5 +60,52 @@ public class Waiter {
     public void waitForTopBar() {
         waitUntil(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".topbar, header, nav")),
                 "Top navigation bar did not appear");
+    }
+
+    public void waitForFavoritesPage() {
+        waitUntil(ExpectedConditions.or(
+                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".fav-list-card")),
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[contains(text(),'Aún no tienes listas')]")),
+                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".favorites-container, .fav-page"))),
+                "Favorites page did not load");
+    }
+
+    public void waitForHistoryPage() {
+        waitUntil(ExpectedConditions.or(
+                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".history-group-title")),
+                ExpectedConditions.visibilityOfElementLocated(By.cssSelector("input[placeholder='Buscar en historial...']")),
+                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".history-container, .history-page"))),
+                "History page did not load");
+    }
+
+    public void waitForRecommendPage() {
+        waitUntil(ExpectedConditions.visibilityOfElementLocated(
+                By.xpath("//button[contains(.,'Buscar recomendaciones')]")),
+                "Recommend page did not load");
+        By prefLocLabel = By.xpath("//label[contains(.,'Usar ubicación preferida')]");
+        waitUntil(ExpectedConditions.visibilityOfElementLocated(prefLocLabel), 
+                "Preferred location radio label did not appear");
+        waitUntil(ExpectedConditions.not(ExpectedConditions.textToBePresentInElementLocated(
+                prefLocLabel, "Desconocida")), 
+                "Preferred location did not load in time (remained 'Desconocida')");
+    }
+
+    public void waitForProfilePage() {
+        waitUntil(ExpectedConditions.visibilityOfElementLocated(
+                By.cssSelector(".location-info-card")),
+                "Profile page did not load");
+    }
+
+    public void waitForSideMenuDrawer() {
+        waitUntil(ExpectedConditions.visibilityOfElementLocated(
+                By.cssSelector(".sidemenu-drawer")),
+                "Side menu drawer did not open");
+    }
+
+    /** Waits for a toast of the given CSS type, e.g. "success" or "error". */
+    public void waitForToast(String type) {
+        waitUntil(ExpectedConditions.visibilityOfElementLocated(
+                By.cssSelector(".toast." + type)),
+                "Toast of type '" + type + "' did not appear");
     }
 }

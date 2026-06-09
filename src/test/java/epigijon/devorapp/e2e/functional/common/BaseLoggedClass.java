@@ -7,8 +7,10 @@ import giis.selema.manager.SeleManager;
 import giis.selema.manager.SelemaConfig;
 import giis.selema.services.browser.DynamicGridBrowserService;
 import giis.selema.services.impl.WatermarkService;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.util.EntityUtils;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
@@ -67,14 +69,18 @@ public class BaseLoggedClass {
 
     private static CloseableHttpClient apiClient;
 
-    protected static String testUsername;
-    protected static String testEmail;
-    protected static String testPassword;
+    private static final java.util.Map<Class<?>, String> classEmails = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<Class<?>, String> classPasswords = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<Class<?>, String> classUsernames = new java.util.concurrent.ConcurrentHashMap<>();
+
+    protected String testUsername;
+    protected String testEmail;
+    protected String testPassword;
 
     // ── JUnit lifecycle ───────────────────────────────────────────────────────────
 
     @BeforeAll
-    static void setupAll() throws IOException {
+    public static void setupAll() throws IOException {
         properties = new Properties();
         properties.load(Files.newInputStream(Paths.get("src/test/resources/test.properties")));
 
@@ -83,7 +89,16 @@ public class BaseLoggedClass {
         sutUrl = envUrl != null ? envUrl : properties.getProperty("FRONTEND_URL", "http://localhost");
         log.info("Browser base URL: {}", sutUrl);
 
-        seleManager.setBrowser("chrome").setArguments(new String[]{"--start-maximized", "--incognito"});
+        String headlessProp = System.getProperty("headless") != null
+                ? System.getProperty("headless")
+                : properties.getProperty("HEADLESS_BROWSER", "false");
+
+        if ("true".equalsIgnoreCase(headlessProp)) {
+            log.info("Running Chrome in headless mode.");
+            seleManager.setBrowser("chrome").setArguments(new String[]{"--start-maximized", "--incognito", "--headless=new"});
+        } else {
+            seleManager.setBrowser("chrome").setArguments(new String[]{"--start-maximized", "--incognito"});
+        }
         if (System.getenv("SELENOID_PRESENT") != null) {
             seleManager.setDriverUrl("http://selenium-hub:4444/wd/hub")
                     .add(new DynamicGridBrowserService().setVideo())
@@ -99,7 +114,20 @@ public class BaseLoggedClass {
         log.info("Starting: {}", testInfo.getDisplayName());
         driver = seleManager.getDriver();
         waiter = new Waiter(driver);
-        driver.get(sutUrl);
+        String currentUrl = driver.getCurrentUrl();
+        if (currentUrl == null || currentUrl.isEmpty() || currentUrl.startsWith("about:") || currentUrl.startsWith("data:")) {
+            driver.get(sutUrl);
+        }
+        try {
+            driver.manage().deleteAllCookies();
+            ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.localStorage.clear();");
+            ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.sessionStorage.clear();");
+        } catch (Exception e) {
+            log.warn("Could not clear cookies or web storage: {}", e.getMessage());
+        }
+        this.testEmail = classEmails.get(this.getClass());
+        this.testPassword = classPasswords.get(this.getClass());
+        this.testUsername = classUsernames.get(this.getClass());
     }
 
     @AfterEach
@@ -109,7 +137,7 @@ public class BaseLoggedClass {
 
     /** Closes the shared API client. Runs after all subclass {@code @AfterAll} methods. */
     @AfterAll
-    static void tearDownAll() throws IOException {
+    public static void tearDownAll() throws IOException {
         if (apiClient != null) {
             apiClient.close();
             apiClient = null;
@@ -122,11 +150,33 @@ public class BaseLoggedClass {
      * Registers a new test user via {@code POST /api/register} and stores the
      * credentials for later teardown.  Call from a subclass {@code @BeforeAll}.
      */
+    private static Class<?> getCallingClass() {
+        try {
+            StackTraceElement[] st = Thread.currentThread().getStackTrace();
+            for (StackTraceElement ste : st) {
+                String name = ste.getClassName();
+                if (!name.equals(Thread.class.getName()) && 
+                    !name.equals(BaseLoggedClass.class.getName()) && 
+                    !name.contains("java.lang")) {
+                    return Class.forName(name);
+                }
+            }
+        } catch (Exception e) {
+            // fallback
+        }
+        return BaseLoggedClass.class;
+    }
+
+    /**
+     * Registers a new test user via {@code POST /api/register} and stores the
+     * credentials for later teardown.  Call from a subclass {@code @BeforeAll}.
+     */
     protected static void setupTestUser(String username, String email, String password)
             throws IOException {
-        testUsername = username;
-        testEmail    = email;
-        testPassword = password;
+        Class<?> callingClass = getCallingClass();
+        classUsernames.put(callingClass, username);
+        classEmails.put(callingClass, email);
+        classPasswords.put(callingClass, password);
 
         String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
         JsonObject payload = new JsonObject();
@@ -135,13 +185,39 @@ public class BaseLoggedClass {
         payload.addProperty("password",  password);
         payload.addProperty("nombre",    "UITester");
         payload.addProperty("apellidos", "Test");
-        payload.addProperty("ubicacion", "");
+        payload.addProperty("ubicacion", "Gijón");
 
         HttpPost reg = new HttpPost(apiBase + "/api/register");
         reg.setEntity(new StringEntity(payload.toString(), ContentType.APPLICATION_JSON));
         reg.addHeader("Accept", "application/json");
-        apiClient.execute(reg);
+        try (CloseableHttpResponse resp = apiClient.execute(reg)) {
+            EntityUtils.consume(resp.getEntity());
+        }
         log.info("Registered browser test user: {}", email);
+    }
+
+    /**
+     * Registers a new test user via {@code POST /api/register} directly via the API client
+     * without storing the credentials in the static maps (to prevent session pollution for other tests).
+     */
+    protected static void registerUserApi(String username, String email, String password)
+            throws IOException {
+        String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
+        JsonObject payload = new JsonObject();
+        payload.addProperty("username",  username);
+        payload.addProperty("email",     email);
+        payload.addProperty("password",  password);
+        payload.addProperty("nombre",    "UITester");
+        payload.addProperty("apellidos", "Test");
+        payload.addProperty("ubicacion", "Gijón");
+
+        HttpPost reg = new HttpPost(apiBase + "/api/register");
+        reg.setEntity(new StringEntity(payload.toString(), ContentType.APPLICATION_JSON));
+        reg.addHeader("Accept", "application/json");
+        try (CloseableHttpResponse resp = apiClient.execute(reg)) {
+            EntityUtils.consume(resp.getEntity());
+        }
+        log.info("Registered API-only test user: {}", email);
     }
 
     /**
@@ -151,27 +227,82 @@ public class BaseLoggedClass {
      * ({@link #tearDownAll}) which closes the API client runs after this.
      */
     protected static void tearDownTestUser() {
-        if (testEmail == null || testPassword == null || apiClient == null) return;
+        Class<?> callingClass = getCallingClass();
+        String email = classEmails.get(callingClass);
+        String password = classPasswords.get(callingClass);
+        if (email == null || password == null || apiClient == null) return;
         try {
             String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
 
             JsonObject loginPayload = new JsonObject();
-            loginPayload.addProperty("identifier", testEmail);
-            loginPayload.addProperty("password",   testPassword);
+            loginPayload.addProperty("identifier", email);
+            loginPayload.addProperty("password",   password);
             HttpPost login = new HttpPost(apiBase + "/api/login");
             login.setEntity(new StringEntity(loginPayload.toString(), ContentType.APPLICATION_JSON));
             login.addHeader("Accept", "application/json");
-            apiClient.execute(login);
+            try (CloseableHttpResponse resp = apiClient.execute(login)) {
+                EntityUtils.consume(resp.getEntity());
+            }
 
             URIBuilder ub = new URIBuilder(apiBase + "/api/profile");
-            ub.addParameter("password", testPassword);
-            apiClient.execute(new HttpDelete(ub.build()));
-            log.info("Deleted browser test user: {}", testEmail);
+            ub.addParameter("password", password);
+            try (CloseableHttpResponse resp = apiClient.execute(new HttpDelete(ub.build()))) {
+                EntityUtils.consume(resp.getEntity());
+            }
+            log.info("Deleted browser test user: {}", email);
         } catch (Exception e) {
-            log.warn("Could not delete browser test user {}: {}", testEmail, e.getMessage());
+            log.warn("Could not delete browser test user {}: {}", email, e.getMessage());
         } finally {
-            testEmail    = null;
-            testPassword = null;
+            classEmails.remove(callingClass);
+            classPasswords.remove(callingClass);
+            classUsernames.remove(callingClass);
+        }
+    }
+
+    /**
+     * POSTs a JSON body to the given absolute URL using the shared API client.
+     * The client is already authenticated if {@link #setupTestUser} was called.
+     * Returns the response body as a parsed {@link com.google.gson.JsonObject}.
+     */
+    protected com.google.gson.JsonObject apiPost(String url, String jsonBody)
+            throws IOException {
+        HttpPost req = new HttpPost(url);
+        req.setEntity(new StringEntity(jsonBody, ContentType.APPLICATION_JSON));
+        req.addHeader("Accept", "application/json");
+        try (CloseableHttpResponse resp = apiClient.execute(req)) {
+            String body = EntityUtils.toString(resp.getEntity());
+            return com.google.gson.JsonParser.parseString(body).getAsJsonObject();
+        }
+    }
+
+    /**
+     * Logs in the test user (using {@link #testEmail} / {@link #testPassword})
+     * with the shared API client so that subsequent {@link #apiPost} / {@link #apiDelete}
+     * calls carry the JWT session cookie.
+     */
+    protected void apiLogin() throws IOException {
+        String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
+        JsonObject payload = new JsonObject();
+        payload.addProperty("identifier", testEmail);
+        payload.addProperty("password", testPassword);
+        HttpPost login = new HttpPost(apiBase + "/api/login");
+        login.setEntity(new StringEntity(payload.toString(), ContentType.APPLICATION_JSON));
+        login.addHeader("Accept", "application/json");
+        try (CloseableHttpResponse resp = apiClient.execute(login)) {
+            EntityUtils.consume(resp.getEntity());
+        }
+    }
+
+    /**
+     * DELETEs the given absolute URL using the shared API client.
+     * Returns the HTTP status code.
+     */
+    protected int apiDelete(String url) throws IOException {
+        try (CloseableHttpResponse resp = apiClient.execute(new HttpDelete(url))) {
+            int status = resp.getStatusLine().getStatusCode();
+            EntityUtils.consume(resp.getEntity());
+            return status;
         }
     }
 }
+
