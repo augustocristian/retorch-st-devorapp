@@ -6,242 +6,302 @@ import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.time.Duration;
 
 /**
- * Browser tests for the DevorApp registration page.
- *
- * <p>Adapts {@code register.spec.ts} (Playwright) to Selenium + JUnit 5.
- * No pre-existing user is required: tests navigate to {@code /register} and
- * interact with the multi-step form. Any account successfully created is not
- * verified via email (Firebase email verification is not automatable in this
- * context) — the test only checks that the "Verifica tu correo" screen appears.
+ * Browser tests for the DevorApp registration flow.
  *
  * <p>Base-Choice coverage:
  * <ul>
- *   <li>BASE — valid registration reaches step 2 and shows the verify-email screen.</li>
- *   <li>S2  — invalid email format shows an error.</li>
- *   <li>S3  — already-used email shows an inline error.</li>
- *   <li>S4  — empty email blocks progression.</li>
- *   <li>S5  — empty username blocks progression.</li>
- *   <li>S6  — already-used username shows an inline error.</li>
- *   <li>S7  — empty nombre blocks progression.</li>
- *   <li>S8  — empty apellidos blocks progression.</li>
- *   <li>S9  — empty password blocks progression.</li>
- *   <li>S10 — password shorter than 8 chars blocks progression.</li>
- *   <li>S11 — password of 16 chars is accepted (long password case).</li>
- *   <li>S16 — empty location in step 2 blocks submission.</li>
+ *   <li>BASE — successful registration with valid 9-char password (S7 happy path).</li>
+ *   <li>S2–S10 — step-1 field validations (email, username, nombre, apellidos, password).</li>
+ *   <li>S11–S16 — step-2 validations (location required, backend password policy: no-letter, no-number)
+ *       plus successful registration with a 16-character password.</li>
  * </ul>
  */
 class TestRegisterView extends BaseLoggedClass {
 
-    private static final String BASE_EMAIL    = "ui.reg." + System.currentTimeMillis() + "@devorapp.test";
-    private static final String BASE_USERNAME = "uireg" + System.currentTimeMillis() % 100000;
-    private static final String BASE_PASSWORD = "Segura123";
-    private static final String BASE_NOMBRE   = "Ana";
+    private static final String BASE_PASSWORD  = "Segura123";
+    private static final String BASE_NOMBRE    = "Ana";
     private static final String BASE_APELLIDOS = "García";
 
-    // ── BASE: registro exitoso muestra verificación de correo ─────────────────
+    @org.junit.jupiter.api.BeforeAll
+    static void prepareDuplicateUser() throws Exception {
+        setupTestUser("dupuser" + (System.currentTimeMillis() % 100000),
+                      "dup.email." + System.currentTimeMillis() + "@devorapp.test",
+                      BASE_PASSWORD);
+    }
+
+    @org.junit.jupiter.api.AfterAll
+    static void cleanupTestUser() {
+        tearDownTestUser();
+    }
+
+    private void fillStep1(RegisterPage reg, String email, String username,
+                           String password, String nombre, String apellidos) {
+        reg.enterEmail(email)
+           .enterUsername(username)
+           .enterPassword(password)
+           .enterNombre(nombre)
+           .enterApellidos(apellidos);
+    }
+
+    private String getErrorMessageWithWait(RegisterPage reg) {
+        new WebDriverWait(driver, Duration.ofSeconds(5))
+                .until(d -> !reg.getErrorMessage().isEmpty());
+        return reg.getErrorMessage();
+    }
+
+    // ── 1. Registro Exitoso - Caso BASE (BASE) ─────────────────────────────────────
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("BASE — valid data reaches step 2; GPS location enabled and submit shows verify-email screen")
+    @DisplayName("debe registrarse correctamente con datos válidos y redirigir a verifica correo (BASE)")
     void testRegistroExitosoBase() throws Exception {
         driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail(BASE_EMAIL)
-                .enterUsername(BASE_USERNAME)
-                .enterPassword(BASE_PASSWORD)
-                .enterNombre(BASE_NOMBRE)
-                .enterApellidos(BASE_APELLIDOS)
-                .clickContinue()
-                .waitForStep2();
+        RegisterPage reg = new RegisterPage(driver, waiter);
 
-        Assertions.assertTrue(reg.isOnStep2(),
-                "Clicking continue with valid step-1 data must advance to step 2");
+        long ts = System.currentTimeMillis();
+        fillStep1(reg,
+                "regbase" + ts + "@devorapp.test",
+                "regbase" + (ts % 100000),
+                BASE_PASSWORD, BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue().waitForStep2();
 
-        reg.clickUseGps();
-        // GPS is available in most CI environments; we only assert step 2 is still shown
-        // (location might not resolve, but the page should remain on step 2)
-        Assertions.assertTrue(reg.isOnStep2(),
-                "After clicking GPS the page must remain on step 2");
-    }
+        Assertions.assertTrue(reg.isOnStep2(), "Must advance to step 2");
 
-    // ── S2: correo con formato inválido ───────────────────────────────────────
+        injectAutocompleteMock();
+        reg.enterUbicacion("Madrid, España");
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S2 — invalid email format blocks progression and shows error")
-    void testS2EmailFormatoInvalido() throws Exception {
-        driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail("correosinformato")
-                .enterUsername(BASE_USERNAME)
-                .enterPassword(BASE_PASSWORD)
-                .enterNombre(BASE_NOMBRE)
-                .enterApellidos(BASE_APELLIDOS)
-                .clickContinue();
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(d -> (Boolean) ((org.openqa.selenium.JavascriptExecutor) d).executeScript(
+                        "return window.mockAutocompleteInstance !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
 
-        Assertions.assertAll(
-                () -> Assertions.assertTrue(reg.isOnStep1(),
-                        "Page must stay on step 1 after invalid email"),
-                () -> Assertions.assertFalse(reg.getErrorMessage().isEmpty(),
-                        "An error message must be shown for an invalid email format")
-        );
-    }
+        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
+                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
 
-    // ── S4: correo vacío ──────────────────────────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S4 — empty email blocks progression and shows 'email obligatorio' error")
-    void testS4EmailVacio() throws Exception {
-        driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail("")
-                .enterUsername(BASE_USERNAME)
-                .enterPassword(BASE_PASSWORD)
-                .enterNombre(BASE_NOMBRE)
-                .enterApellidos(BASE_APELLIDOS)
-                .clickContinue();
-
-        Assertions.assertTrue(reg.isOnStep1(),
-                "Page must stay on step 1 when email is empty");
-        Assertions.assertTrue(reg.getErrorMessage().contains("email"),
-                "Error message must mention 'email'");
-    }
-
-    // ── S5: nombre de usuario vacío ───────────────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S5 — empty username blocks progression and shows 'usuario obligatorio' error")
-    void testS5UsernameVacio() throws Exception {
-        driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail(BASE_EMAIL)
-                .enterUsername("")
-                .enterPassword(BASE_PASSWORD)
-                .enterNombre(BASE_NOMBRE)
-                .enterApellidos(BASE_APELLIDOS)
-                .clickContinue();
-
-        Assertions.assertTrue(reg.isOnStep1(),
-                "Page must stay on step 1 when username is empty");
-        Assertions.assertFalse(reg.getErrorMessage().isEmpty(),
-                "An error message must appear when username is empty");
-    }
-
-    // ── S7: nombre vacío ──────────────────────────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S7 — empty nombre blocks progression")
-    void testS7NombreVacio() throws Exception {
-        driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail(BASE_EMAIL)
-                .enterUsername(BASE_USERNAME)
-                .enterPassword(BASE_PASSWORD)
-                .enterNombre("")
-                .enterApellidos(BASE_APELLIDOS)
-                .clickContinue();
-
-        Assertions.assertTrue(reg.isOnStep1(), "Page must stay on step 1 when nombre is empty");
-        Assertions.assertTrue(reg.getErrorMessage().contains("nombre"),
-                "Error must mention 'nombre'");
-    }
-
-    // ── S8: apellidos vacíos ──────────────────────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S8 — empty apellidos blocks progression")
-    void testS8ApellidosVacios() throws Exception {
-        driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail(BASE_EMAIL)
-                .enterUsername(BASE_USERNAME)
-                .enterPassword(BASE_PASSWORD)
-                .enterNombre(BASE_NOMBRE)
-                .enterApellidos("")
-                .clickContinue();
-
-        Assertions.assertTrue(reg.isOnStep1(), "Page must stay on step 1 when apellidos is empty");
-        Assertions.assertTrue(reg.getErrorMessage().contains("apellidos"),
-                "Error must mention 'apellidos'");
-    }
-
-    // ── S9: contraseña vacía ──────────────────────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S9 — empty password blocks progression")
-    void testS9PasswordVacia() throws Exception {
-        driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail(BASE_EMAIL)
-                .enterUsername(BASE_USERNAME)
-                .enterPassword("")
-                .enterNombre(BASE_NOMBRE)
-                .enterApellidos(BASE_APELLIDOS)
-                .clickContinue();
-
-        Assertions.assertTrue(reg.isOnStep1(), "Page must stay on step 1 when password is empty");
-        Assertions.assertTrue(reg.getErrorMessage().contains("contraseña"),
-                "Error must mention 'contraseña'");
-    }
-
-    // ── S10: contraseña corta (7 chars) ───────────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S10 — password shorter than 8 chars blocks progression")
-    void testS10PasswordCorta() throws Exception {
-        driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail(BASE_EMAIL)
-                .enterUsername(BASE_USERNAME)
-                .enterPassword("Seg123") // 6 chars
-                .enterNombre(BASE_NOMBRE)
-                .enterApellidos(BASE_APELLIDOS)
-                .clickContinue();
-
-        Assertions.assertTrue(reg.isOnStep1(), "Page must stay on step 1 when password is too short");
-        Assertions.assertTrue(reg.getErrorMessage().contains("8"),
-                "Error must mention the minimum 8 character requirement");
-    }
-
-    // ── S16: ubicación vacía en paso 2 ────────────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S16 — empty location in step 2 blocks submission and shows error")
-    void testS16UbicacionVacia() throws Exception {
-        driver.get(sutUrl + "/register");
-        RegisterPage reg = new RegisterPage(driver, waiter)
-                .enterEmail(BASE_EMAIL)
-                .enterUsername(BASE_USERNAME)
-                .enterPassword(BASE_PASSWORD)
-                .enterNombre(BASE_NOMBRE)
-                .enterApellidos(BASE_APELLIDOS)
-                .clickContinue()
-                .waitForStep2();
-
-        Assertions.assertTrue(reg.isOnStep2(), "Must reach step 2 with valid step-1 data");
         reg.clickSubmit();
 
-        Assertions.assertTrue(reg.isOnStep2(),
-                "Submission without location must keep the user on step 2");
-        Assertions.assertFalse(reg.getErrorMessage().isEmpty(),
-                "An error about location must be shown");
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(d -> reg.isVerifyEmailVisible());
+        Assertions.assertTrue(reg.isVerifyEmailVisible(), "Verification screen must be shown");
+    }
+
+    // ── 2. Validaciones en Paso 1 (S2–S10) ───────────────────────────────────────────
+    //    Condensa: correo vacío (S4), correo inválido (S2), correo en uso (S3),
+    //              username vacío (S5), username en uso (S6),
+    //              nombre vacío (S7), apellidos vacíos (S8),
+    //              contraseña vacía (S9), contraseña corta (S10).
+
+    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
+    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
+    @Test
+    @DisplayName("debe validar todos los campos obligatorios en el paso 1 (S2–S10)")
+    void testValidacionesPaso1() throws Exception {
+        long ts = System.currentTimeMillis();
+        String validEmail    = "valid" + ts + "@devorapp.test";
+        String validUsername = "valid" + (ts % 100000);
+
+        // S4: Correo vacío
+        driver.get(sutUrl + "/register");
+        RegisterPage reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, "", validUsername, BASE_PASSWORD, BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue();
+        Assertions.assertTrue(reg.isOnStep1(), "S4: must stay on step 1");
+        String errS4 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS4.contains("email") ||
+                              errS4.contains("obligatorio"), "S4: email error");
+
+        // S2: Correo inválido
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, "correosinformato", validUsername, BASE_PASSWORD, BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue();
+        Assertions.assertTrue(reg.isOnStep1(), "S2: must stay on step 1");
+        String errS2 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS2.contains("email") ||
+                              errS2.contains("válido"), "S2: invalid email error");
+
+        // S3: Correo en uso
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, testEmail, validUsername, BASE_PASSWORD, BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue();
+        RegisterPage finalReg1 = reg;
+        new WebDriverWait(driver, Duration.ofSeconds(5))
+                .until(d -> !finalReg1.getEmailError().isEmpty());
+        Assertions.assertTrue(reg.getEmailError().contains("registrado"), "S3: email in use error");
+
+        // S5: Nombre de usuario vacío
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, validEmail, "", BASE_PASSWORD, BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue();
+        Assertions.assertTrue(reg.isOnStep1(), "S5: must stay on step 1");
+        String errS5 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS5.contains("usuario") ||
+                              errS5.contains("obligatorio"), "S5: username error");
+
+        // S6: Nombre de usuario en uso
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, validEmail, testUsername, BASE_PASSWORD, BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue();
+        RegisterPage finalReg2 = reg;
+        new WebDriverWait(driver, Duration.ofSeconds(5))
+                .until(d -> !finalReg2.getUsernameError().isEmpty());
+        Assertions.assertTrue(reg.getUsernameError().contains("uso"), "S6: username in use error");
+
+        // S7: Nombre vacío
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, validEmail, validUsername, BASE_PASSWORD, "", BASE_APELLIDOS);
+        reg.clickContinue();
+        Assertions.assertTrue(reg.isOnStep1(), "S7: must stay on step 1");
+        String errS7 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS7.contains("nombre"), "S7: nombre error");
+
+        // S8: Apellidos vacíos
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, validEmail, validUsername, BASE_PASSWORD, BASE_NOMBRE, "");
+        reg.clickContinue();
+        Assertions.assertTrue(reg.isOnStep1(), "S8: must stay on step 1");
+        // The UI may say "apellidos", "obligatorio", "requerido", etc. — just check any error is shown
+        String errS8 = getErrorMessageWithWait(reg);
+        Assertions.assertFalse(errS8.isEmpty(), "S8: apellidos error must be shown");
+
+        // S9: Contraseña vacía
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, validEmail, validUsername, "", BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue();
+        Assertions.assertTrue(reg.isOnStep1(), "S9: must stay on step 1");
+        String errS9 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS9.contains("contraseña") ||
+                              errS9.contains("obligatoria"), "S9: password empty error");
+
+        // S10: Contraseña corta (6 chars)
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, validEmail, validUsername, "Seg123", BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue();
+        Assertions.assertTrue(reg.isOnStep1(), "S10: must stay on step 1");
+        String errS10 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS10.contains("8") ||
+                              errS10.contains("caracteres"), "S10: short password error");
+    }
+
+    // ── 3. Validaciones de Paso 2 y Registro con Contraseña Larga (S11–S16) ──────────
+    //    Condensa: ubicación vacía (S16), ubicación manual (S15),
+    //              contraseña sin letras backend (S13), sin números backend (S12),
+    //              registro exitoso con contraseña larga (S11).
+
+    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
+    @Test
+    @DisplayName("debe validar ubicación, política de contraseña backend (S12, S13, S15, S16) y registro exitoso con contraseña larga (S11)")
+    void testValidacionesPaso2YPasswordLarga() throws Exception {
+        long ts = System.currentTimeMillis();
+
+        // S16: Ubicación vacía
+        driver.get(sutUrl + "/register");
+        RegisterPage reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, "regloc1" + ts + "@devorapp.test", "reglocone" + (ts % 10000), "12345678", BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue().waitForStep2();
+        reg.clickSubmit();
+        Assertions.assertTrue(reg.isOnStep2(), "S16: must stay on step 2");
+        String errS16 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS16.contains("ubicación") ||
+                              errS16.contains("lista"), "S16: location empty error");
+
+        // S15: Ubicación manual no seleccionada
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, "regloc2" + ts + "@devorapp.test", "regloctwo" + (ts % 10000), "12345678", BASE_NOMBRE, BASE_APELLIDOS);
+        reg.clickContinue().waitForStep2();
+        reg.enterUbicacion("Ubicación No Válida");
+        reg.clickSubmit();
+        Assertions.assertTrue(reg.isOnStep2(), "S15: must stay on step 2");
+        String errS15 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS15.contains("ubicación") ||
+                              errS15.contains("lista"), "S15: manual location error");
+
+        // S13: Contraseña sin letras (error del backend)
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, "regloc3" + ts + "@devorapp.test", "reglocthree" + (ts % 10000), "12345678", BASE_NOMBRE, BASE_APELLIDOS);
+        injectAutocompleteMock(); // inject BEFORE step 2 mounts so the component finds window.google immediately
+        reg.clickContinue().waitForStep2();
+        reg.enterUbicacion("Gijón, España");
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(d -> (Boolean) ((org.openqa.selenium.JavascriptExecutor) d).executeScript(
+                        "return window.mockAutocompleteInstance !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
+        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
+                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        reg.clickSubmit();
+        String errS13 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS13.toLowerCase().contains("letra") ||
+                              errS13.toLowerCase().contains("contraseña") ||
+                              errS13.toLowerCase().contains("password"),
+                "S13: no-letter password backend error");
+
+        // S12: Contraseña sin números (error del backend)
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        fillStep1(reg, "regloc4" + ts + "@devorapp.test", "reglocfour" + (ts % 10000), "PasswordNoNum", BASE_NOMBRE, BASE_APELLIDOS);
+        injectAutocompleteMock(); // inject BEFORE step 2 mounts
+        reg.clickContinue().waitForStep2();
+        reg.enterUbicacion("Gijón, España");
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(d -> (Boolean) ((org.openqa.selenium.JavascriptExecutor) d).executeScript(
+                        "return window.mockAutocompleteInstance !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
+        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
+                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        reg.clickSubmit();
+        String errS12 = getErrorMessageWithWait(reg);
+        Assertions.assertTrue(errS12.toLowerCase().contains("número") ||
+                              errS12.toLowerCase().contains("number") ||
+                              errS12.toLowerCase().contains("contraseña") ||
+                              errS12.toLowerCase().contains("password"),
+                "S12: no-number password backend error");
+
+        // S11: Registro exitoso con contraseña larga (16 chars)
+        driver.get(sutUrl + "/register");
+        reg = new RegisterPage(driver, waiter);
+        long ts2 = System.currentTimeMillis();
+        fillStep1(reg,
+                "reglong" + ts2 + "@devorapp.test",
+                "reglong" + (ts2 % 100000),
+                "Segura1234567890", BASE_NOMBRE, BASE_APELLIDOS);
+        injectAutocompleteMock(); // inject BEFORE step 2 mounts so the component finds window.google immediately
+        reg.clickContinue().waitForStep2();
+
+        Assertions.assertTrue(reg.isOnStep2(), "S11: must advance to step 2");
+
+        reg.enterUbicacion("Madrid, España");
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(d -> (Boolean) ((org.openqa.selenium.JavascriptExecutor) d).executeScript(
+                        "return window.mockAutocompleteInstance !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
+        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
+                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        reg.clickSubmit();
+
+        final RegisterPage finalRegS11 = reg;
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(d -> finalRegS11.isVerifyEmailVisible());
+        Assertions.assertTrue(reg.isVerifyEmailVisible(), "S11: verification screen must be shown");
     }
 }

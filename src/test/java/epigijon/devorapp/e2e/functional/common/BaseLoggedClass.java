@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Properties;
 
 /**
@@ -118,16 +119,47 @@ public class BaseLoggedClass {
         if (currentUrl == null || currentUrl.isEmpty() || currentUrl.startsWith("about:") || currentUrl.startsWith("data:")) {
             driver.get(sutUrl);
         }
-        try {
-            driver.manage().deleteAllCookies();
-            ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.localStorage.clear();");
-            ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.sessionStorage.clear();");
-        } catch (Exception e) {
-            log.warn("Could not clear cookies or web storage: {}", e.getMessage());
-        }
+        clearSession();
         this.testEmail = classEmails.get(this.getClass());
         this.testPassword = classPasswords.get(this.getClass());
         this.testUsername = classUsernames.get(this.getClass());
+    }
+
+    /**
+     * Clears cookies, localStorage, sessionStorage, and synchronises deletion of
+     * all IndexedDB databases (where Firebase stores JWT tokens).
+     */
+    public void clearSession() {
+        try {
+            driver.manage().deleteAllCookies();
+        } catch (Exception ignored) {}
+        try {
+            ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.localStorage.clear();");
+        } catch (Exception ignored) {}
+        try {
+            ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("window.sessionStorage.clear();");
+        } catch (Exception ignored) {}
+        try {
+            driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(5));
+            ((org.openqa.selenium.JavascriptExecutor) driver).executeAsyncScript(
+                "var callback = arguments[arguments.length - 1];" +
+                "if (window.indexedDB && window.indexedDB.databases) {" +
+                "  window.indexedDB.databases().then(function(dbs) {" +
+                "    var promises = dbs.map(function(db) {" +
+                "      return new Promise(function(resolve) {" +
+                "        var req = window.indexedDB.deleteDatabase(db.name);" +
+                "        req.onsuccess = function() { resolve(); };" +
+                "        req.onerror = function() { resolve(); };" +
+                "        req.onblocked = function() { resolve(); };" +
+                "      });" +
+                "    });" +
+                "    Promise.all(promises).then(function() { callback(); }).catch(function() { callback(); });" +
+                "  }).catch(function() { callback(); });" +
+                "} else {" +
+                "  callback();" +
+                "}"
+            );
+        } catch (Exception ignored) {}
     }
 
     @AfterEach
@@ -303,6 +335,43 @@ public class BaseLoggedClass {
             EntityUtils.consume(resp.getEntity());
             return status;
         }
+    }
+
+    /** Injects a bulletproof Google Maps Autocomplete mock into the window object. */
+    protected void injectAutocompleteMock() {
+        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
+                "const mockAutocompleteClass = class {\n" +
+                "  constructor(input, options) {\n" +
+                "    window.mockAutocompleteInstance = this;\n" +
+                "    this.input = input;\n" +
+                "  }\n" +
+                "  addListener(event, callback) {\n" +
+                "    if (!this.listeners) this.listeners = {};\n" +
+                "    if (!this.listeners[event]) this.listeners[event] = [];\n" +
+                "    this.listeners[event].push(callback);\n" +
+                "    return { remove: () => {} };\n" +
+                "  }\n" +
+                "  getPlace() {\n" +
+                "    return {\n" +
+                "      formatted_address: this.input ? this.input.value : 'Barcelona, España'\n" +
+                "    };\n" +
+                "  }\n" +
+                "  setTypes() {}\n" +
+                "  setBounds() {}\n" +
+                "  setFields() {}\n" +
+                "  setComponentRestrictions() {}\n" +
+                "  getBounds() { return {}; }\n" +
+                "  getFields() { return []; }\n" +
+                "  setOptions() {}\n" +
+                "};\n" +
+                "const mockPlaces = {};\n" +
+                "Object.defineProperty(mockPlaces, 'Autocomplete', { value: mockAutocompleteClass, writable: false, configurable: false });\n" +
+                "const mockMaps = {};\n" +
+                "Object.defineProperty(mockMaps, 'places', { value: mockPlaces, writable: false, configurable: false });\n" +
+                "const mockGoogle = {};\n" +
+                "Object.defineProperty(mockGoogle, 'maps', { value: mockMaps, writable: false, configurable: false });\n" +
+                "Object.defineProperty(window, 'google', { value: mockGoogle, writable: false, configurable: false });\n"
+        );
     }
 }
 

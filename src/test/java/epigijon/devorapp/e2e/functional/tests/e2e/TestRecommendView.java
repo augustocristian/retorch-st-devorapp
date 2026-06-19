@@ -9,6 +9,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.time.Duration;
 
 /**
  * Browser tests for the DevorApp recommendation search page
@@ -21,12 +25,13 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Base-Choice coverage:
  * <ul>
- *   <li>BASE  — search with base filters (categories + prices + ubicación preferida) works.</li>
- *   <li>S2    — no categories selected → request is still sent.</li>
- *   <li>S4    — no price selected → request is still sent.</li>
- *   <li>S6    — "Sin precio" unchecked → does not block search.</li>
- *   <li>S7    — "Abierto ahora" unchecked → does not block search.</li>
- *   <li>S9    — other-location selected but left empty → error message shown.</li>
+ *   <li>BASE — search with base filters (categories + prices + ubicación preferida) works.</li>
+ *   <li>S2 — no categories selected → request is still sent without error.</li>
+ *   <li>S4 — no price selected → request is still sent without error.</li>
+ *   <li>S6 — "Sin precio" unchecked → does not block search.</li>
+ *   <li>S7 — "Abierto ahora" unchecked → does not block search.</li>
+ *   <li>S8 — another valid location is chosen → search completes without error.</li>
+ *   <li>S9 — other-location selected but left empty → error message shown.</li>
  * </ul>
  */
 class TestRecommendView extends BaseLoggedClass {
@@ -42,9 +47,14 @@ class TestRecommendView extends BaseLoggedClass {
         tearDownTestUser();
     }
 
+    private void clearSessionAndLogin() {
+        clearSession();
+        driver.get(sutUrl + "/login");
+    }
+
     /** Logs in and navigates to /recommend-restaurants. */
     private RecommendPage loginAndGoToRecommend() throws Exception {
-        driver.get(sutUrl + "/login");
+        clearSessionAndLogin();
         new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
                 .enterPassword(testPassword)
@@ -53,76 +63,84 @@ class TestRecommendView extends BaseLoggedClass {
         return new RecommendPage(driver, waiter);
     }
 
-    // ── BASE: filtros base con ubicación preferida ────────────────────────────
+    // ── 1. BASE + S8: búsqueda con filtros base (ubicación preferida y alternativa) ────
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("BASE — searching with base filters and preferred location does not error out")
-    void testBase_BusquedaFiltrosBase() throws Exception {
+    @DisplayName("BASE — búsqueda con filtros base y ubicación preferida/alternativa (BASE, S8)")
+    void testBase_BusquedaFiltrosBaseYUbicacionAlternativa() throws Exception {
+        // BASE: preferred location + multiple categories + multiple prices
         RecommendPage page = loginAndGoToRecommend();
-
         page.addCategory("Mexicano", "Mexicano");
         page.clickPrice("€€");
         page.setIncludeNoPrice(true);
         page.setOpenNow(true);
         page.selectPreferredLocation();
         page.search();
-
-        // Either results are shown OR the page remains error-free
         Assertions.assertFalse(page.hasErrorMessage(),
-                "BASE search must not produce a validation error");
+                "BASE: search with base filters must not produce a validation error");
+
+        // S8: alternate location (autocomplete mock needed)
+        page = loginAndGoToRecommend();
+        page.addCategory("Mexicano",  "Mexicano");
+        page.addCategory("Italiano",  "Italiano");
+        page.clickPrice("€");
+        page.clickPrice("€€");
+
+        injectAutocompleteMock();
+        page.selectOtherLocation("Barcelona, España");
+
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(d -> (Boolean) ((JavascriptExecutor) d).executeScript(
+                        "return window.mockAutocompleteInstance !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
+        ((JavascriptExecutor) driver).executeScript(
+                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+
+        page.search();
+        Assertions.assertFalse(page.hasErrorMessage(),
+                "S8: search with custom location and multiple filters must not produce an error");
     }
 
-    // ── S2+S4: sin categorías ni precio seleccionados ─────────────────────────
+    // ── 2. S2, S4, S6, S7: filtros opcionales sin categorías ni precio, booleanos en falso ─
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("S2+S4 — searching with no categories and no price is allowed (no frontend error)")
-    void testS2S4_SinCategoriasNiPrecio() throws Exception {
+    @DisplayName("S2, S4, S6, S7 — búsqueda sin categorías ni precio y con booleanos en false")
+    void testFiltrosOpcionales() throws Exception {
+        // S2 + S4: no categories, no prices → search without frontend error
         RecommendPage page = loginAndGoToRecommend();
-
-        // No categories, no prices — just search with preferred location
         page.selectPreferredLocation();
         page.search();
-
         Assertions.assertFalse(page.hasErrorMessage(),
-                "Searching without categories or prices must not block with an error");
-    }
+                "S2/S4: searching without categories or prices must not block with an error");
 
-    // ── S6+S7: sin precio y sin abierto-ahora ────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S6+S7 — unchecking 'sin precio' and 'abierto ahora' still allows search")
-    void testS6S7_BooleanosFalse() throws Exception {
-        RecommendPage page = loginAndGoToRecommend();
-
+        // S6 + S7: uncheck "sin precio" and "abierto ahora" — user is still logged in
+        driver.get(sutUrl + "/recommend-restaurants");
+        page = new RecommendPage(driver, waiter);
         page.addCategory("Italiano", "Italiano");
         page.setIncludeNoPrice(false);
         page.setOpenNow(false);
         page.selectPreferredLocation();
         page.search();
-
         Assertions.assertFalse(page.hasErrorMessage(),
-                "Unchecking boolean filters must not produce a validation error");
+                "S6/S7: unchecking boolean filters must not produce a validation error");
     }
 
-    // ── S9: ubicación alternativa vacía → error ───────────────────────────────
+    // ── 3. S9: ubicación alternativa vacía → error de validación ──────────────────────
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("S9 — selecting 'otra ubicación' but leaving it empty blocks search with an error")
+    @DisplayName("S9 — seleccionar 'otra ubicación' vacía bloquea la búsqueda con un error")
     void testS9_OtraUbicacionVacia() throws Exception {
         RecommendPage page = loginAndGoToRecommend();
-
         page.addCategory("Mexicano", "Mexicano");
         page.selectOtherLocation(""); // empty location
         page.search();
@@ -131,9 +149,8 @@ class TestRecommendView extends BaseLoggedClass {
                 () -> Assertions.assertTrue(page.hasErrorMessage(),
                         "Searching without a location when 'otra ubicación' is selected must show an error"),
                 () -> Assertions.assertTrue(
-                        page.getErrorMessage().toLowerCase().contains("ubicación")
-                                || page.getErrorMessage().toLowerCase().contains("localiz"),
-                        "Error message must mention location")
-        );
+                        page.getErrorMessage().toLowerCase().contains("ubicación") ||
+                        page.getErrorMessage().toLowerCase().contains("localiz"),
+                        "Error message must mention location"));
     }
 }

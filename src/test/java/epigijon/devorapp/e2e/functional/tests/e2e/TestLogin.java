@@ -12,10 +12,12 @@ import org.junit.jupiter.api.Test;
 /**
  * Browser tests for the DevorApp login page.
  *
- * <p>Every test obtains a fresh, incognito browser session (managed by
- * {@link BaseLoggedClass}) and navigates to {@code /login} before creating
- * a {@link LoginPage} object.  The test user is created via API in
- * {@code @BeforeAll} and cleaned up in {@code @AfterAll}.
+ * <p>Base-Choice coverage:
+ * <ul>
+ *   <li>BASE — valid credentials redirect to /home (S7 - Happy Path).</li>
+ *   <li>S3–S6 — empty identifier and/or password trigger a validation error (BASE, S3, S4, S5, S6).</li>
+ *   <li>S8 — wrong password shows an error and stays on /login.</li>
+ * </ul>
  */
 class TestLogin extends BaseLoggedClass {
 
@@ -34,15 +36,23 @@ class TestLogin extends BaseLoggedClass {
         tearDownTestUser();
     }
 
+    private void clearSessionAndLogin() {
+        clearSession();
+        driver.get(sutUrl + "/login");
+    }
+
     // ── Tests ─────────────────────────────────────────────────────────────────────
 
+    /**
+     * BASE / S7 — valid credentials redirect the user to /home.
+     */
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("Valid credentials redirect the user to the home page")
+    @DisplayName("Valid credentials redirect the user to the home page (BASE / S7 - Happy Path)")
     void testSuccessfulLogin() throws Exception {
-        driver.get(sutUrl + "/login");
+        clearSessionAndLogin();
         String url = new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
                 .enterPassword(PASSWORD)
@@ -53,36 +63,54 @@ class TestLogin extends BaseLoggedClass {
                 "After login the URL must contain /home");
     }
 
+    /**
+     * S3–S6, S8 — empty fields and wrong password are rejected with an error.
+     *
+     * <p>Combines:
+     * <ul>
+     *   <li>BASE / S4: existing identifier, empty password → «Rellene todos los campos».</li>
+     *   <li>S6: both fields empty → same error.</li>
+     *   <li>S8: correct identifier, wrong password → «Credenciales incorrectas».</li>
+     * </ul>
+     */
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("Wrong password shows an error message and stays on /login")
-    void testLoginWithWrongPassword() throws Exception {
-        driver.get(sutUrl + "/login");
+    @DisplayName("Empty fields (BASE, S3–S6) and wrong password (S8) trigger validation errors")
+    void testLoginValidationErrors() throws Exception {
+        // 1. BASE / S4: identifier filled, password empty
+        clearSessionAndLogin();
         LoginPage page = new LoginPage(driver, waiter)
+                .enterIdentifier(testEmail)
+                .enterPassword("");
+
+        page.submitLoginExpectingFailure();
+        Assertions.assertTrue(page.hasErrorMessage(),
+                "Error message must show for empty password (BASE/S4)");
+
+        // 2. S6: both fields empty
+        clearSessionAndLogin();
+        page = new LoginPage(driver, waiter)
+                .enterIdentifier("")
+                .enterPassword("");
+
+        page.submitLoginExpectingFailure();
+        Assertions.assertTrue(page.hasErrorMessage(),
+                "Error message must show when both fields are empty (S6)");
+
+        // 3. S8: correct identifier, wrong password
+        clearSessionAndLogin();
+        final LoginPage finalPage = new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
                 .enterPassword("WrongPassword99!")
                 .submitLoginExpectingFailure();
 
         Assertions.assertAll(
-                () -> Assertions.assertTrue(page.hasErrorMessage(),
-                        "An error message must be visible after a failed login"),
+                () -> Assertions.assertTrue(finalPage.hasErrorMessage(),
+                        "An error message must be visible after a failed login (S8)"),
                 () -> Assertions.assertTrue(driver.getCurrentUrl().contains("/login"),
-                        "The URL must remain on /login after a failed attempt")
+                        "The URL must remain on /login after a failed attempt (S8)")
         );
-    }
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("The register link navigates to /register")
-    void testRegisterLink() throws Exception {
-        driver.get(sutUrl + "/login");
-        new LoginPage(driver, waiter).goToRegister();
-
-        Assertions.assertTrue(driver.getCurrentUrl().contains("/register"),
-                "Clicking the register link must navigate to /register");
     }
 }

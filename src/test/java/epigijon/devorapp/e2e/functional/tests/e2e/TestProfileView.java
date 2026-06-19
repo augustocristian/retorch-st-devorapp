@@ -9,6 +9,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+
+import java.time.Duration;
 
 /**
  * Browser tests for the DevorApp profile page ({@code /profile}).
@@ -17,16 +24,11 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Base-Choice coverage:
  * <ul>
- *   <li>BASE   — profile loads and shows correct user data.</li>
- *   <li>Caso 2 — cancelling personal-info edit restores original values.</li>
- *   <li>S2/S3  — editing nombre and apellidos and saving updates the card.</li>
- *   <li>S5     — invalid email format is rejected (HTML5 validation).</li>
- *   <li>S8     — wrong password for email change shows error toast.</li>
- *   <li>S6     — already-used email shows error toast.</li>
- *   <li>S10    — wrong current password for password change shows error toast.</li>
- *   <li>S13    — new password too short shows error toast.</li>
- *   <li>S14    — correct password change shows success toast.</li>
- *   <li>S17    — typing CONFIRMAR enables delete button and deletes account.</li>
+ *   <li>BASE — profile data loads correctly.</li>
+ *   <li>S2–S4, Caso 2, 18 — cancel/save personal info, bad and good location update.</li>
+ *   <li>S5–S9, Caso 3 — email change validations and happy path.</li>
+ *   <li>S10–S16 — password change validations and happy path.</li>
+ *   <li>S17 — account deletion.</li>
  * </ul>
  */
 class TestProfileView extends BaseLoggedClass {
@@ -42,162 +44,232 @@ class TestProfileView extends BaseLoggedClass {
         tearDownTestUser();
     }
 
+    private void clearSessionAndLogin() {
+        clearSession();
+        driver.get(sutUrl + "/login");
+    }
+
     /** Logs in and navigates to /profile. */
     private ProfilePage loginAndGoToProfile() throws Exception {
-        driver.get(sutUrl + "/login");
+        clearSessionAndLogin();
         new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
                 .enterPassword(testPassword)
                 .submitLogin();
         driver.get(sutUrl + "/profile");
-        return new ProfilePage(driver, waiter);
+        ProfilePage page = new ProfilePage(driver, waiter);
+        waiter.waitUntil(ExpectedConditions.textToBePresentInElementLocated(
+                By.cssSelector(".location-info-card"), "UITester"),
+                "Profile data did not load (name 'UITester' not found)");
+        return page;
     }
 
-    // ── BASE: carga de datos del perfil ───────────────────────────────────────
+    // ── 1. Carga inicial + Gestión de Información Personal y Ubicación (BASE, S2–S4, Caso 2, 18) ───
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
+    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("BASE — profile page loads and shows the authenticated user's data")
-    void testBase_CargaPerfil() throws Exception {
-        ProfilePage page = loginAndGoToProfile();
+    @DisplayName("debe cargar datos y gestionar información personal y ubicación (BASE, S2, S3, S4, Caso 2, 18)")
+    void testCargarYGestionarInformacionPersonalYUbicacion() throws Exception {
+        // Register a dedicated user to avoid cross-test pollution when mutating profile data
+        long ts = System.currentTimeMillis();
+        String localEmail    = "personalui" + ts + "@devorapp.test";
+        String localUsername = "personalui" + (ts % 100000);
+        String localPassword = "Test1234!";
+        registerUserApi(localUsername, localEmail, localPassword);
 
+        clearSessionAndLogin();
+        new LoginPage(driver, waiter)
+                .enterIdentifier(localEmail)
+                .enterPassword(localPassword)
+                .submitLogin();
+        driver.get(sutUrl + "/profile");
+        ProfilePage page = new ProfilePage(driver, waiter);
+        waiter.waitUntil(ExpectedConditions.textToBePresentInElementLocated(
+                By.cssSelector(".location-info-card"), "UITester"), "Profile did not load");
+
+        // BASE: data is present
         String personalCardText = page.getCardText("Información Personal");
-        Assertions.assertFalse(personalCardText.isEmpty(),
-                "The personal info card must contain user data after loading");
-    }
+        String locationCardText = page.getCardText("Ubicación Preferida");
+        Assertions.assertTrue(personalCardText.contains("UITester"), "BASE: personal card must contain name");
+        Assertions.assertTrue(personalCardText.contains("Test"),     "BASE: personal card must contain surname");
+        Assertions.assertTrue(locationCardText.contains("Gijón"),    "BASE: location card must contain preferred location");
 
-    // ── Caso 2: cancelar edición restaura valores originales ─────────────────
+        injectAutocompleteMock();
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("Caso 2 — cancelling personal info edit restores the original values")
-    void testCaso2_CancelarEdicion() throws Exception {
-        ProfilePage page = loginAndGoToProfile();
-
-        String original = page.getCardText("Información Personal");
-
+        // Caso 2: Cancel personal edit restores original values
         page.editPersonalInfo()
-                .fillInputInCard("Información Personal", 0, "NombreTemporal")
+                .fillInputInCard("Información Personal", 0, "JuanModificado")
+                .fillInputInCard("Información Personal", 1, "PérezModificado")
                 .cancelPersonalInfo();
+        Assertions.assertTrue(page.getCardText("Información Personal").contains("UITester"),
+                "Caso 2: cancel must restore original name");
 
-        String after = page.getCardText("Información Personal");
-        Assertions.assertEquals(original, after,
-                "Cancelling edit must restore the original personal info values");
-    }
-
-    // ── S2+S3: editar nombre y apellidos correctamente ────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @Test
-    @DisplayName("S2+S3 — editing nombre and apellidos and saving shows success toast and updates card")
-    void testS2S3_EditarNombreApellidos() throws Exception {
-        ProfilePage page = loginAndGoToProfile();
-
+        // S2 & S3: Save updated nombre/apellidos
         page.editPersonalInfo()
-                .fillInputInCard("Información Personal", 0, "NuevoNombre")
-                .fillInputInCard("Información Personal", 1, "NuevosApellidos")
+                .fillInputInCard("Información Personal", 0, "Juan")
+                .fillInputInCard("Información Personal", 1, "Pérez")
                 .savePersonalInfo();
-
         waiter.waitForToast("success");
+        Assertions.assertTrue(page.hasSuccessToast(), "S2/S3: success toast must appear");
+        page.dismissSuccessToast();
+        personalCardText = page.getCardText("Información Personal");
+        Assertions.assertTrue(personalCardText.contains("Juan"),  "S2: card must contain updated name");
+        Assertions.assertTrue(personalCardText.contains("Pérez"), "S3: card must contain updated surname");
 
-        Assertions.assertAll(
-                () -> Assertions.assertTrue(page.hasSuccessToast(),
-                        "A success toast must appear after saving personal info"),
-                () -> Assertions.assertTrue(
-                        page.getCardText("Información Personal").contains("NuevoNombre"),
-                        "The card must reflect the updated nombre")
-        );
+        // 18: Type location manually without selecting → error
+        page.clickButtonInCard("Ubicación Preferida", "Cambiar")
+                .fillInputInCard("Ubicación Preferida", 0, "aifgauif")
+                .clickButtonInCard("Ubicación Preferida", "Guardar cambios");
+        Assertions.assertTrue(page.getCardText("Ubicación Preferida").contains("Debes seleccionar una ubicación válida"),
+                "18: manual-typed location must show inline error");
+
+        // S4: Select location from autocomplete list
+        page.fillInputInCard("Ubicación Preferida", 0, "Barcelona, España");
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(d -> (Boolean) ((JavascriptExecutor) d).executeScript(
+                        "return window.mockAutocompleteInstance !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners !== undefined && " +
+                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
+        ((JavascriptExecutor) driver).executeScript(
+                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        page.clickButtonInCard("Ubicación Preferida", "Guardar cambios");
+        waiter.waitForToast("success");
+        Assertions.assertTrue(page.hasSuccessToast(), "S4: success toast must appear after updating location");
+        new WebDriverWait(driver, Duration.ofSeconds(10))
+                .until(ExpectedConditions.textToBePresentInElementLocated(
+                        By.xpath("//div[contains(@class,'location-info-card') and contains(.,'Ubicación Preferida')]"),
+                        "Barcelona, España"));
     }
 
-    // ── S8: contraseña incorrecta al cambiar email → error toast ─────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S8 — wrong password for email change shows an error toast")
-    void testS8_ContrasenaIncorrectaEmail() throws Exception {
-        ProfilePage page = loginAndGoToProfile();
-
-        page.openEmailChange()
-                .fillNewEmail("nuevo" + System.currentTimeMillis() + "@devorapp.test")
-                .fillEmailPassword("WrongPassword99!")
-                .submitEmailChange();
-
-        waiter.waitForToast("error");
-
-        Assertions.assertTrue(page.hasErrorToast(),
-                "An error toast must appear when the wrong password is given for email change");
-        Assertions.assertTrue(page.getErrorToastText().toLowerCase().contains("contraseña")
-                        || page.getErrorToastText().toLowerCase().contains("password")
-                        || page.getErrorToastText().toLowerCase().contains("incorrecta"),
-                "Error toast must mention incorrect password");
-    }
-
-    // ── S10: contraseña actual incorrecta al cambiar contraseña ──────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S10 — wrong current password for password change shows an error toast")
-    void testS10_ContrasenaActualIncorrecta() throws Exception {
-        ProfilePage page = loginAndGoToProfile();
-
-        page.openPasswordChange()
-                .fillPasswordChange("WrongPassword99!", "NuevaPass123!", "NuevaPass123!")
-                .submitPasswordChange();
-
-        waiter.waitForToast("error");
-
-        Assertions.assertTrue(page.hasErrorToast(),
-                "An error toast must appear when the current password is wrong");
-    }
-
-    // ── S13: contraseña nueva muy corta → error toast ────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S13 — new password shorter than 8 chars shows an error toast")
-    void testS13_NuevaContrasenaCorta() throws Exception {
-        ProfilePage page = loginAndGoToProfile();
-
-        page.openPasswordChange()
-                .fillPasswordChange(testPassword, "Sh1!", "Sh1!")
-                .submitPasswordChange();
-
-        waiter.waitForToast("error");
-
-        Assertions.assertTrue(page.hasErrorToast(),
-                "An error toast must appear when the new password is too short");
-        Assertions.assertTrue(page.getErrorToastText().contains("8")
-                        || page.getErrorToastText().toLowerCase().contains("caracteres"),
-                "Error must mention the 8-character minimum");
-    }
-
-    // ── S17: eliminar cuenta con confirmación ─────────────────────────────────
+    // ── 2. Gestión de Correo y Contraseña (S5–S16, Caso 3) ──────────────────────────
+    //    Condensa: validaciones de email (S5–S9, Caso 3) y de password (S10–S16).
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
-    @DisplayName("S17 — typing CONFIRMAR enables delete button; account is deleted and redirects to /login")
-    void testS17_EliminarCuenta() throws Exception {
-        // Create a separate user just for deletion so other tests are unaffected
+    @DisplayName("debe validar y permitir cambiar el correo (S5–S9, Caso 3) y la contraseña (S10–S16)")
+    void testGestionarCorreoYContrasena() throws Exception {
+        long ts = System.currentTimeMillis();
+
+        // ── Email section ───────────────────────────────────────────────────────────
+        String emailUserEmail    = "tempemail" + ts + "@devorapp.test";
+        String emailUserUsername = "tempemail" + (ts % 100000);
+        String emailUserPassword = "Password123!";
+        registerUserApi(emailUserUsername, emailUserEmail, emailUserPassword);
+
+        driver.get(sutUrl + "/login");
+        new LoginPage(driver, waiter)
+                .enterIdentifier(emailUserEmail)
+                .enterPassword(emailUserPassword)
+                .submitLogin();
+        driver.get(sutUrl + "/profile");
+        ProfilePage page = new ProfilePage(driver, waiter);
+        page.openEmailChange();
+
+        // S7 & S9: required attributes
+        WebElement emailInput = driver.findElement(By.cssSelector("input[type='email']"));
+        WebElement passInput  = driver.findElement(By.id("email-password-input"));
+        Assertions.assertEquals("true", emailInput.getAttribute("required"), "S7: email must be required");
+        Assertions.assertEquals("true", passInput.getAttribute("required"),  "S9: password must be required");
+
+        // S5: invalid email format (HTML5 validation)
+        page.fillNewEmail("invalidemail").fillEmailPassword(emailUserPassword).submitEmailChange();
+        Boolean isInvalid = (Boolean) ((JavascriptExecutor) driver).executeScript(
+                "return !arguments[0].checkValidity();", emailInput);
+        Assertions.assertTrue(isInvalid, "S5: HTML5 validity must fail for invalid email format");
+
+        // S8: wrong password
+        page.fillNewEmail("nuevo" + ts + "@correo.com").fillEmailPassword("WrongPassword!").submitEmailChange();
+        waiter.waitForToast("error");
+        Assertions.assertTrue(page.hasErrorToast(), "S8: error toast must appear for wrong password");
+        page.dismissErrorToast();
+
+        // S6: email already in use
+        page.fillNewEmail(testEmail).fillEmailPassword(emailUserPassword).submitEmailChange();
+        waiter.waitForToast("error");
+        Assertions.assertTrue(page.hasErrorToast(), "S6: error toast must appear for email in use");
+        page.dismissErrorToast();
+
+        // Caso 3: successful email change
+        String newEmail = "newtempemail" + ts + "@devorapp.test";
+        page.fillNewEmail(newEmail).fillEmailPassword(emailUserPassword).submitEmailChange();
+        waiter.waitForToast("success");
+        Assertions.assertTrue(page.hasSuccessToast(), "Caso 3: success toast must appear");
+        Assertions.assertTrue(page.getSuccessToastText().contains("confirmación"),
+                "Caso 3: toast must mention confirmation");
+        Assertions.assertTrue(page.getCardText("Correo Electrónico").contains(emailUserEmail),
+                "Caso 3: card must still display original email");
+
+        // ── Password section ────────────────────────────────────────────────────────
+        long ts2 = System.currentTimeMillis();
+        String passUserEmail    = "temppass" + ts2 + "@devorapp.test";
+        String passUserUsername = "temppass" + (ts2 % 100000);
+        String passUserPassword = "Password123!";
+        registerUserApi(passUserUsername, passUserEmail, passUserPassword);
+
+        driver.get(sutUrl + "/login");
+        new LoginPage(driver, waiter)
+                .enterIdentifier(passUserEmail)
+                .enterPassword(passUserPassword)
+                .submitLogin();
+        driver.get(sutUrl + "/profile");
+        page = new ProfilePage(driver, waiter);
+        page.openPasswordChange();
+
+        // S11 & S12: required attributes
+        WebElement currentPassInput = driver.findElement(By.id("current-password-input"));
+        WebElement newPassInput     = driver.findElement(By.id("new-password-input"));
+        Assertions.assertEquals("true", currentPassInput.getAttribute("required"), "S11: current pass must be required");
+        Assertions.assertEquals("true", newPassInput.getAttribute("required"),     "S12: new pass must be required");
+
+        // S13: password too short (7 chars)
+        page.fillPasswordChange(passUserPassword, "Short1!", "Short1!").submitPasswordChange();
+        waiter.waitForToast("error");
+        Assertions.assertTrue(page.hasErrorToast(), "S13: error toast for short password");
+        Assertions.assertTrue(page.getErrorToastText().contains("8") ||
+                              page.getErrorToastText().toLowerCase().contains("caracteres"), "S13: message content");
+        page.dismissErrorToast();
+
+        // S15: no numbers in new password
+        page.fillPasswordChange(passUserPassword, "OnlyLettersPassword", "OnlyLettersPassword").submitPasswordChange();
+        waiter.waitForToast("error");
+        Assertions.assertTrue(page.hasErrorToast(), "S15: error toast for no-number password");
+        page.dismissErrorToast();
+
+        // S16: no letters in new password
+        page.fillPasswordChange(passUserPassword, "1234567890", "1234567890").submitPasswordChange();
+        waiter.waitForToast("error");
+        Assertions.assertTrue(page.hasErrorToast(), "S16: error toast for no-letter password");
+        page.dismissErrorToast();
+
+        // S10: wrong old password
+        page.fillPasswordChange("WrongPassword!", "NewPassword123!", "NewPassword123!").submitPasswordChange();
+        waiter.waitForToast("error");
+        Assertions.assertTrue(page.hasErrorToast(), "S10: error toast for wrong old password");
+        page.dismissErrorToast();
+
+        // S14: successful password change (16-char new password)
+        page.fillPasswordChange(passUserPassword, "NewPassword12345!", "NewPassword12345!").submitPasswordChange();
+        waiter.waitForToast("success");
+        Assertions.assertTrue(page.hasSuccessToast(), "S14: success toast must appear");
+    }
+
+    // ── 3. Eliminar Cuenta (S17) ──────────────────────────────────────────────────────
+
+    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
+    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
+    @Test
+    @DisplayName("debe eliminar la cuenta tras escribir CONFIRMAR y redirigir a login (S17)")
+    void testEliminarCuenta_S17() throws Exception {
         long ts = System.currentTimeMillis();
         String delEmail    = "delui" + ts + "@devorapp.test";
         String delUsername = "delui" + (ts % 100000);
         String delPassword = "Delete1234!";
 
-        // Register via the existing helper
         registerUserApi(delUsername, delEmail, delPassword);
 
         driver.get(sutUrl + "/login");
@@ -208,24 +280,31 @@ class TestProfileView extends BaseLoggedClass {
         driver.get(sutUrl + "/profile");
 
         ProfilePage page = new ProfilePage(driver, waiter);
-        page.openDeleteAccount()
-                .fillDeleteConfirm("CONFIRMAR")
-                .submitDeleteAccount();
+        page.openDeleteAccount();
 
+        Assertions.assertFalse(page.isDeleteButtonEnabled(),
+                "Delete button must be disabled before typing confirm phrase");
+
+        page.fillDeleteConfirm("NO_CONFIRMAR");
+        Assertions.assertFalse(page.isDeleteButtonEnabled(),
+                "Delete button must remain disabled with incorrect phrase");
+
+        page.fillDeleteConfirm("CONFIRMAR");
+        Assertions.assertTrue(page.isDeleteButtonEnabled(),
+                "Delete button must be enabled with CONFIRMAR");
+
+        page.submitDeleteAccount();
         waiter.waitForToast("success");
 
         Assertions.assertAll(
                 () -> Assertions.assertTrue(page.hasSuccessToast(),
                         "A success toast must appear after account deletion"),
                 () -> {
-                    new org.openqa.selenium.support.ui.WebDriverWait(driver,
-                            java.time.Duration.ofSeconds(5))
-                            .until(org.openqa.selenium.support.ui.ExpectedConditions
-                                    .urlContains("/login"));
+                    new WebDriverWait(driver, Duration.ofSeconds(5))
+                            .until(ExpectedConditions.urlContains("/login"));
                     Assertions.assertTrue(driver.getCurrentUrl().contains("/login"),
                             "After deletion the user must be redirected to /login");
                 }
         );
-
     }
 }

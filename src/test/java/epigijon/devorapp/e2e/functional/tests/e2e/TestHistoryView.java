@@ -24,6 +24,7 @@ import java.io.IOException;
  * <ul>
  *   <li>BASE   — multiple months, multiple restaurants, no search filter.</li>
  *   <li>Caso 2 — empty history shows 0 groups and 0 cards.</li>
+ *   <li>Caso 3 — 1 month with multiple restaurants.</li>
  *   <li>Caso 5 — exactly 1 restaurant in history.</li>
  *   <li>Caso 6 — search term filters cards and hides non-matching months.</li>
  * </ul>
@@ -44,9 +45,14 @@ class TestHistoryView extends BaseLoggedClass {
         tearDownTestUser();
     }
 
+    private void clearSessionAndLogin() {
+        clearSession();
+        driver.get(sutUrl + "/login");
+    }
+
     /** Logs in and navigates to /history. */
     private HistoryPage loginAndGoToHistory() throws Exception {
-        driver.get(sutUrl + "/login");
+        clearSessionAndLogin();
         new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
                 .enterPassword(testPassword)
@@ -64,7 +70,7 @@ class TestHistoryView extends BaseLoggedClass {
         apiPost(apiBase + "/api/historial", payload.toString());
     }
 
-    // ── BASE: múltiples entradas en historial ─────────────────────────────────
+    // ── BASE: múltiples entradas en historial ──────────────────────────────────────────
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
@@ -86,46 +92,47 @@ class TestHistoryView extends BaseLoggedClass {
         );
     }
 
-    // ── Caso 2: historial vacío ───────────────────────────────────────────────
-
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "historial",   concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("Caso 2 — an empty history shows 0 month groups and 0 restaurant cards")
-    void testCaso2_HistorialVacio() throws Exception {
-        HistoryPage page = loginAndGoToHistory();
-
-        if (page.getGroupCount() == 0) {
-            Assertions.assertEquals(0, page.getCardCount(),
-                    "With 0 groups there must also be 0 restaurant cards");
-        }
-        Assertions.assertNotNull(page, "History page must load without errors");
-    }
-
-    // ── Caso 5: exactamente 1 restaurante ────────────────────────────────────
+    // ── Caso 2, 3 y 5 condensados: vacío, 1 mes varios restaurantes, 1 restaurante ────
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @AccessMode(resID = "historial",   concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("Caso 5 — history with 1 restaurant shows exactly 1 card inside 1 group")
-    void testCaso5_UnRestaurante() throws Exception {
-        addHistorialEntry(PLACE_A);
-
+    @DisplayName("debe gestionar historial vacío (Caso 2), con 1 restaurante (Caso 5) y 1 mes con varios (Caso 3)")
+    void testCasosVacioYUnitario() throws Exception {
+        // Caso 2: empty history
         HistoryPage page = loginAndGoToHistory();
+        if (page.getGroupCount() == 0) {
+            Assertions.assertEquals(0, page.getCardCount(),
+                    "Caso 2: with 0 groups there must also be 0 restaurant cards");
+        }
+        Assertions.assertNotNull(page, "History page must load without errors");
 
+        // Caso 5: exactly 1 restaurant entry
+        addHistorialEntry(PLACE_A);
+        driver.get(sutUrl + "/history");
+        final HistoryPage caso5Page = new HistoryPage(driver, waiter);
         Assertions.assertAll(
-                () -> Assertions.assertTrue(page.getGroupCount() >= 1,
-                        "At least 1 month group must exist when there is 1 history entry"),
-                () -> Assertions.assertTrue(page.getCardCount() >= 1,
-                        "At least 1 card must be visible for the history entry")
+                () -> Assertions.assertTrue(caso5Page.getGroupCount() >= 1,
+                        "Caso 5: at least 1 month group must exist when there is 1 history entry"),
+                () -> Assertions.assertTrue(caso5Page.getCardCount() >= 1,
+                        "Caso 5: at least 1 card must be visible for the history entry")
+        );
+
+        // Caso 3: 1 month with multiple restaurants (add a second entry)
+        addHistorialEntry(PLACE_B);
+        driver.get(sutUrl + "/history");
+        final HistoryPage caso3Page = new HistoryPage(driver, waiter);
+        Assertions.assertAll(
+                () -> Assertions.assertTrue(caso3Page.getGroupCount() >= 1,
+                        "Caso 3: at least 1 month group must be visible"),
+                () -> Assertions.assertTrue(caso3Page.getCardCount() >= 2,
+                        "Caso 3: at least 2 restaurant cards must be visible in the same month group")
         );
     }
 
-    // ── Caso 6: búsqueda filtra por nombre ───────────────────────────────────
+    // ── Caso 6: búsqueda filtra por nombre ────────────────────────────────────────────
 
     @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
@@ -142,7 +149,6 @@ class TestHistoryView extends BaseLoggedClass {
         Assertions.assertTrue(before >= 1, "Must have at least 1 card before searching");
 
         page.search("zzz_nada_xyzzy_no_match");
-
         Assertions.assertEquals(0, page.getCardCount(),
                 "Searching with a non-matching term must hide all restaurant cards");
     }

@@ -167,6 +167,16 @@ public class ProfilePage extends BasePage {
         return clickButtonInCard("Zona de Peligro", "Eliminar permanentemente");
     }
 
+    /** Returns true if the final delete button is enabled. */
+    public boolean isDeleteButtonEnabled() throws ElementNotFoundException {
+        WebElement card = cardWith("Zona de Peligro");
+        WebElement btn = card.findElements(org.openqa.selenium.By.tagName("button")).stream()
+                .filter(b -> b.getText().contains("Eliminar permanentemente"))
+                .findFirst()
+                .orElseThrow(() -> new ElementNotFoundException("Delete button not found"));
+        return btn.isEnabled();
+    }
+
     // ── Toast queries ─────────────────────────────────────────────────────────
 
     /** Returns {@code true} if a success toast is visible. */

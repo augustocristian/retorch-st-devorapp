@@ -21,20 +21,15 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Browser tests for the restaurant rating modal, accessible from the history page.
- *
- * <p>Adapts {@code rating.spec.ts} (Playwright) to Selenium + JUnit 5.
- * A history entry is created via the API before each test, so the
- * browser can navigate to {@code /history} and open the rating modal.
+ * Browser tests for the DevorApp rating modal (accessed from the history page).
  *
  * <p>Base-Choice coverage:
  * <ul>
- *   <li>BASE  — all 4 aspects at max stars + comment → submit succeeds.</li>
- *   <li>S2    — calidad = 0 → submit button is disabled.</li>
- *   <li>S5    — precio = 0 → submit button is disabled.</li>
- *   <li>S8    — higiene = 0 → submit button is disabled.</li>
- *   <li>S11   — trato = 0 → submit button is disabled.</li>
- *   <li>S14   — empty comment is accepted (comment is optional).</li>
+ *   <li>BASE — all aspects rated at max with a comment → submission succeeds.</li>
+ *   <li>S2, S5, S8, S11 — any single aspect at 0 stars disables the submit button.</li>
+ *   <li>S3, S4, S6, S7 — variable calidad/precio ratings with the rest at max → succeeds.</li>
+ *   <li>S9, S10, S12, S13 — variable higiene/trato ratings with the rest at max → succeeds.</li>
+ *   <li>S14 — empty comment is accepted.</li>
  * </ul>
  */
 class TestRatingView extends BaseLoggedClass {
@@ -62,10 +57,15 @@ class TestRatingView extends BaseLoggedClass {
         tearDownTestUser();
     }
 
-    // ── Navigation helpers ────────────────────────────────────────────────────
+    // ── Navigation helpers ─────────────────────────────────────────────────────────────
+
+    private void clearSessionAndLogin() {
+        clearSession();
+        driver.get(sutUrl + "/login");
+    }
 
     private HistoryPage loginAndGoToHistory() throws Exception {
-        driver.get(sutUrl + "/login");
+        clearSessionAndLogin();
         new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
                 .enterPassword(testPassword)
@@ -76,11 +76,11 @@ class TestRatingView extends BaseLoggedClass {
 
     private void openRatingModal(HistoryPage page) throws Exception {
         page.openCardMenu(0);
-        WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        WebElement rateBtn = shortWait.until(ExpectedConditions.elementToBeClickable(
+        WebDriverWait modalWait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        WebElement rateBtn = modalWait.until(ExpectedConditions.elementToBeClickable(
                 By.xpath("//button[contains(.,'Valorar restaurante')]")));
         rateBtn.click();
-        shortWait.until(ExpectedConditions.visibilityOfElementLocated(
+        modalWait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.cssSelector(".valuation-content")));
     }
 
@@ -93,7 +93,10 @@ class TestRatingView extends BaseLoggedClass {
                 .orElseThrow(() -> new org.openqa.selenium.NoSuchElementException(
                         "Aspect row not found: " + aspect));
         List<WebElement> svgs = row.findElements(By.tagName("svg"));
-        if (stars <= svgs.size()) svgs.get(stars - 1).click();
+        // Always click the max star first (to clear any pre-filled state from a previous submission),
+        // then click the target star. This handles toggle-behaviour in star rating components.
+        if (svgs.size() >= 5) svgs.get(4).click(); // ensure max is set first
+        if (stars < 5 && stars <= svgs.size()) svgs.get(stars - 1).click(); // then set target
     }
 
     private boolean isSubmitEnabled() {
@@ -101,144 +104,131 @@ class TestRatingView extends BaseLoggedClass {
         return !btns.isEmpty() && btns.get(0).isEnabled();
     }
 
-    // ── BASE: todos los aspectos al máximo + comentario ───────────────────────
-
-    @AccessMode(resID = "web-browser",   concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",      concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "valoraciones",  concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "historial",     concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",          concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("BASE — all aspects at max stars and a comment → submit is enabled and succeeds")
-    void testBase_ValoracionCompleta() throws Exception {
-        HistoryPage page = loginAndGoToHistory();
-        openRatingModal(page);
-
-        selectStars("calidad", 5);
-        selectStars("precio", 5);
-        selectStars("higiene", 5);
-        selectStars("trato", 5);
-
+    private void fillRatings(int calidad, int precio, int higiene, int trato, String comentario) {
+        selectStars("calidad", calidad);
+        selectStars("precio",  precio);
+        selectStars("higiene", higiene);
+        selectStars("trato",   trato);
         WebElement textarea = driver.findElement(By.cssSelector("textarea.textarea-premium"));
         textarea.clear();
-        textarea.sendKeys("Excelente servicio y comida deliciosa");
+        if (comentario != null) textarea.sendKeys(comentario);
+    }
 
-        Assertions.assertTrue(isSubmitEnabled(),
-                "Submit button must be enabled when all aspects are rated");
-
+    private void submitValuationAndVerifySuccess() {
         driver.findElement(By.cssSelector("button.btn-submit-valuation")).click();
-
         new WebDriverWait(driver, Duration.ofSeconds(10))
                 .until(ExpectedConditions.invisibilityOfElementLocated(
                         By.cssSelector(".valuation-content")));
-
         waiter.waitForToast("success");
-
         Assertions.assertFalse(driver.findElements(By.cssSelector(".toast.success")).isEmpty(),
                 "A success toast must appear after a successful rating submission");
     }
 
-    // ── S2: calidad = 0 → botón deshabilitado ─────────────────────────────────
+    // ── 1. BASE: todos los aspectos al máximo con comentario ─────────────────────────
 
     @AccessMode(resID = "web-browser",  concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",     concurrency = 1, sharing = false, accessMode = "READONLY")
+    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "historial",    concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("S2 — calidad=0 (no stars selected) disables the submit button")
-    void testS2_CalidadCero() throws Exception {
+    @DisplayName("debe guardar la valoración con todos los aspectos al máximo y comentario (BASE)")
+    void testGuardarValoracionCompletaBase() throws Exception {
         HistoryPage page = loginAndGoToHistory();
         openRatingModal(page);
-
-        selectStars("precio", 5);
-        selectStars("higiene", 5);
-        selectStars("trato", 5);
-
-        Assertions.assertFalse(isSubmitEnabled(),
-                "Submit must be disabled when calidad has 0 stars");
+        fillRatings(5, 5, 5, 5, "Excelente servicio y comida deliciosa");
+        Assertions.assertTrue(isSubmitEnabled(), "Submit button must be enabled when all aspects are rated");
+        submitValuationAndVerifySuccess();
     }
 
-    // ── S5: precio = 0 → botón deshabilitado ──────────────────────────────────
+    // ── 2. S2, S5, S8, S11 + S14: 0 estrellas deshabilitan el botón; comentario vacío permitido ──
 
     @AccessMode(resID = "web-browser",  concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",     concurrency = 1, sharing = false, accessMode = "READONLY")
+    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "historial",    concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("S5 — precio=0 (no stars selected) disables the submit button")
-    void testS5_PrecioCero() throws Exception {
+    @DisplayName("debe deshabilitar envío con 0 estrellas en cualquier aspecto (S2, S5, S8, S11) y aceptar comentario vacío (S14)")
+    void testValidarCeroEstrellasYComentarioVacio() throws Exception {
+        // S2: Calidad = 0
         HistoryPage page = loginAndGoToHistory();
         openRatingModal(page);
+        fillRatings(0, 5, 5, 5, "Comentario");
+        Assertions.assertFalse(isSubmitEnabled(), "S2: submit must be disabled when calidad has 0 stars");
 
-        selectStars("calidad", 5);
-        selectStars("higiene", 5);
-        selectStars("trato", 5);
+        // S5: Precio = 0
+        driver.get(sutUrl + "/history");
+        page = new HistoryPage(driver, waiter);
+        openRatingModal(page);
+        fillRatings(5, 0, 5, 5, "Comentario");
+        Assertions.assertFalse(isSubmitEnabled(), "S5: submit must be disabled when precio has 0 stars");
 
-        Assertions.assertFalse(isSubmitEnabled(),
-                "Submit must be disabled when precio has 0 stars");
+        // S8: Higiene = 0
+        driver.get(sutUrl + "/history");
+        page = new HistoryPage(driver, waiter);
+        openRatingModal(page);
+        fillRatings(5, 5, 0, 5, "Comentario");
+        Assertions.assertFalse(isSubmitEnabled(), "S8: submit must be disabled when higiene has 0 stars");
+
+        // S11: Trato = 0
+        driver.get(sutUrl + "/history");
+        page = new HistoryPage(driver, waiter);
+        openRatingModal(page);
+        fillRatings(5, 5, 5, 0, "Comentario");
+        Assertions.assertFalse(isSubmitEnabled(), "S11: submit must be disabled when trato has 0 stars");
+
+        // S14: empty comment is accepted
+        driver.get(sutUrl + "/history");
+        page = new HistoryPage(driver, waiter);
+        openRatingModal(page);
+        fillRatings(5, 5, 5, 5, "");
+        Assertions.assertTrue(isSubmitEnabled(), "S14: submit must be enabled even with empty comment");
+        submitValuationAndVerifySuccess();
     }
 
-    // ── S8: higiene = 0 → botón deshabilitado ────────────────────────────────
+    // ── 3. S3, S4, S6, S7, S9, S10, S12, S13: puntuaciones variables ─────────────────
 
     @AccessMode(resID = "web-browser",  concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "frontend",     concurrency = 1, sharing = false, accessMode = "READONLY")
+    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "historial",    concurrency = 1, sharing = false, accessMode = "READWRITE")
     @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
-    @DisplayName("S8 — higiene=0 (no stars selected) disables the submit button")
-    void testS8_HigieneCero() throws Exception {
+    @DisplayName("debe guardar valoraciones con puntuaciones variables de calidad, precio, higiene y trato (S3, S4, S6, S7, S9, S10, S12, S13)")
+    void testPuntuacionesVariables() throws Exception {
+        // S3 & S7: Calidad = 1, Precio = 3 (resto base = 5)
         HistoryPage page = loginAndGoToHistory();
         openRatingModal(page);
+        fillRatings(1, 3, 5, 5, "Comentario");
+        Assertions.assertTrue(isSubmitEnabled(), "S3/S7: submit must be enabled");
+        submitValuationAndVerifySuccess();
 
-        selectStars("calidad", 5);
-        selectStars("precio", 5);
-        selectStars("trato", 5);
-
-        Assertions.assertFalse(isSubmitEnabled(),
-                "Submit must be disabled when higiene has 0 stars");
-    }
-
-    // ── S11: trato = 0 → botón deshabilitado ──────────────────────────────────
-
-    @AccessMode(resID = "web-browser",  concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",     concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "historial",    concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S11 — trato=0 (no stars selected) disables the submit button")
-    void testS11_TratoCero() throws Exception {
-        HistoryPage page = loginAndGoToHistory();
+        // S4 & S6: Calidad = 3, Precio = 1
+        ensureHistorialEntry();
+        driver.get(sutUrl + "/history");
+        page = new HistoryPage(driver, waiter);
         openRatingModal(page);
+        fillRatings(3, 1, 5, 5, "Comentario");
+        Assertions.assertTrue(isSubmitEnabled(), "S4/S6: submit must be enabled");
+        submitValuationAndVerifySuccess();
 
-        selectStars("calidad", 5);
-        selectStars("precio", 5);
-        selectStars("higiene", 5);
-
-        Assertions.assertFalse(isSubmitEnabled(),
-                "Submit must be disabled when trato has 0 stars");
-    }
-
-    // ── S14: comentario vacío es aceptado ─────────────────────────────────────
-
-    @AccessMode(resID = "web-browser",  concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",     concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "historial",    concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
-    @Test
-    @DisplayName("S14 — empty comment with all aspects rated still enables the submit button")
-    void testS14_ComentarioVacio() throws Exception {
-        HistoryPage page = loginAndGoToHistory();
+        // S9 & S13: Higiene = 1, Trato = 3
+        ensureHistorialEntry();
+        driver.get(sutUrl + "/history");
+        page = new HistoryPage(driver, waiter);
         openRatingModal(page);
+        fillRatings(5, 5, 1, 3, "Comentario");
+        Assertions.assertTrue(isSubmitEnabled(), "S9/S13: submit must be enabled");
+        submitValuationAndVerifySuccess();
 
-        selectStars("calidad", 5);
-        selectStars("precio", 5);
-        selectStars("higiene", 5);
-        selectStars("trato", 5);
-
-        WebElement textarea = driver.findElement(By.cssSelector("textarea.textarea-premium"));
-        textarea.clear();
-
-        Assertions.assertTrue(isSubmitEnabled(),
-                "Submit must be enabled even with an empty comment when all stars are rated");
+        // S10 & S12: Higiene = 3, Trato = 1
+        ensureHistorialEntry();
+        driver.get(sutUrl + "/history");
+        page = new HistoryPage(driver, waiter);
+        openRatingModal(page);
+        fillRatings(5, 5, 3, 1, "Comentario");
+        Assertions.assertTrue(isSubmitEnabled(), "S10/S12: submit must be enabled");
+        submitValuationAndVerifySuccess();
     }
 }
