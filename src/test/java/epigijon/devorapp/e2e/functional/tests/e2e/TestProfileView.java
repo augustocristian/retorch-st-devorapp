@@ -3,7 +3,6 @@ package epigijon.devorapp.e2e.functional.tests.e2e;
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.LoginPage;
 import epigijon.devorapp.e2e.functional.pages.ProfilePage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -66,9 +65,6 @@ class TestProfileView extends BaseLoggedClass {
 
     // ── 1. Carga inicial + Gestión de Información Personal y Ubicación (BASE, S2–S4, Caso 2, 18) ───
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("debe cargar datos y gestionar información personal y ubicación (BASE, S2, S3, S4, Caso 2, 18)")
     void testCargarYGestionarInformacionPersonalYUbicacion() throws Exception {
@@ -146,9 +142,6 @@ class TestProfileView extends BaseLoggedClass {
     // ── 2. Gestión de Correo y Contraseña (S5–S16, Caso 3) ──────────────────────────
     //    Condensa: validaciones de email (S5–S9, Caso 3) y de password (S10–S16).
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("debe validar y permitir cambiar el correo (S5–S9, Caso 3) y la contraseña (S10–S16)")
     void testGestionarCorreoYContrasena() throws Exception {
@@ -259,9 +252,6 @@ class TestProfileView extends BaseLoggedClass {
 
     // ── 3. Eliminar Cuenta (S17) ──────────────────────────────────────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("debe eliminar la cuenta tras escribir CONFIRMAR y redirigir a login (S17)")
     void testEliminarCuenta_S17() throws Exception {

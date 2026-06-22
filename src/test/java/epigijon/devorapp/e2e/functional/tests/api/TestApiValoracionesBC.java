@@ -3,7 +3,6 @@ package epigijon.devorapp.e2e.functional.tests.api;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseApiClass;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -44,8 +43,6 @@ class TestApiValoracionesBC extends BaseApiClass {
 
     // ── BASE: valoración completa → todos los campos almacenados ─────────────
 
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("BASE — full rating with all aspects at max stored and retrieved correctly")
     void testBase_ValoracionCompleta() throws IOException {
@@ -66,8 +63,6 @@ class TestApiValoracionesBC extends BaseApiClass {
 
     // ── S3: calidad=1, precio=3 ───────────────────────────────────────────────
 
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S3 — calidad=1, precio=3, higiene=5, trato=5 stored correctly")
     void testS3_CalidadBajaPrecioMedio() throws IOException {
@@ -84,8 +79,6 @@ class TestApiValoracionesBC extends BaseApiClass {
 
     // ── S4: calidad=3, precio=1 ───────────────────────────────────────────────
 
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S4 — calidad=3, precio=1, higiene=5, trato=5 stored correctly")
     void testS4_CalidadMedioPrecioBajo() throws IOException {
@@ -100,8 +93,6 @@ class TestApiValoracionesBC extends BaseApiClass {
 
     // ── S9: higiene=1, trato=3 ───────────────────────────────────────────────
 
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S9 — calidad=5, precio=5, higiene=1, trato=3 stored correctly")
     void testS9_HigieneBajoTratoMedio() throws IOException {
@@ -116,8 +107,6 @@ class TestApiValoracionesBC extends BaseApiClass {
 
     // ── S10: higiene=3, trato=1 ──────────────────────────────────────────────
 
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S10 — calidad=5, precio=5, higiene=3, trato=1 stored correctly")
     void testS10_HigieneMedioTratoBajo() throws IOException {
@@ -132,8 +121,6 @@ class TestApiValoracionesBC extends BaseApiClass {
 
     // ── S14: comentario vacío aceptado ───────────────────────────────────────
 
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S14 — rating with empty comment is accepted (HTTP 201)")
     void testS14_ComentarioVacio() throws IOException {
@@ -147,8 +134,6 @@ class TestApiValoracionesBC extends BaseApiClass {
 
     // ── Eliminar valoración la quita de GET /api/valoraciones ────────────────
 
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Deleting a rating removes it from GET /api/valoraciones")
     void testEliminarValoracion() throws IOException {

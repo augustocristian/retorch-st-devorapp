@@ -3,7 +3,6 @@ package epigijon.devorapp.e2e.functional.tests.e2e;
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.LoginPage;
 import epigijon.devorapp.e2e.functional.pages.SideMenuPage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -48,9 +47,6 @@ class TestSideMenu extends BaseLoggedClass {
 
     // ── 1. BASE + Caso 2: selección de tema (Claro y Oscuro) ─────────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("BASE y Caso 2 — el tema Claro activa data-theme='light' y el Oscuro lo elimina; letra M activa por defecto")
     void testSeleccionTema() throws Exception {
@@ -82,9 +78,6 @@ class TestSideMenu extends BaseLoggedClass {
 
     // ── 2. Caso 3 + Caso 4: selección de tamaño de letra (S y L) ────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 3 y Caso 4 — la letra S y la letra L se aplican correctamente con tema Claro")
     void testSeleccionTamanoLetra() throws Exception {

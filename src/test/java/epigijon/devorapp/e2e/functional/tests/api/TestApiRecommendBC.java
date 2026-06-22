@@ -3,7 +3,6 @@ package epigijon.devorapp.e2e.functional.tests.api;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseApiClass;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -51,7 +50,6 @@ class TestApiRecommendBC extends BaseApiClass {
 
     // ── BASE: búsqueda con filtros base ───────────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("BASE — search with categories, prices and location returns HTTP 200 with results array")
     void testBase_BusquedaFiltrosBase() throws IOException {
@@ -75,7 +73,6 @@ class TestApiRecommendBC extends BaseApiClass {
 
     // ── S2: categorías vacías → HTTP 200 ──────────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S2 — empty categories list is accepted and returns HTTP 200")
     void testS2_CategoriasVacias() throws IOException {
@@ -95,7 +92,6 @@ class TestApiRecommendBC extends BaseApiClass {
 
     // ── S4: precios vacíos → HTTP 200 ────────────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S4 — empty prices list is accepted and returns HTTP 200")
     void testS4_PreciosVacios() throws IOException {
@@ -115,7 +111,6 @@ class TestApiRecommendBC extends BaseApiClass {
 
     // ── S6: include_unconfirmed_price = false ─────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S6 — include_unconfirmed_price=false returns HTTP 200")
     void testS6_SinPrecioNoConfirmado() throws IOException {
@@ -135,7 +130,6 @@ class TestApiRecommendBC extends BaseApiClass {
 
     // ── S7: open_now = false ──────────────────────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S7 — open_now=false is accepted and returns HTTP 200")
     void testS7_NoAbierto() throws IOException {
@@ -162,7 +156,6 @@ class TestApiRecommendBC extends BaseApiClass {
 
     // ── S8: ubicación alternativa ─────────────────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S8 — alternative location is accepted and returns HTTP 200")
     void testS8_UbicacionAlternativa() throws IOException {
@@ -182,7 +175,6 @@ class TestApiRecommendBC extends BaseApiClass {
 
     // ── S10: resultados pueden ser vacíos ─────────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S10 — search returning 0 results returns HTTP 200 with empty results array")
     void testS10_ResultadosVacios() throws IOException {

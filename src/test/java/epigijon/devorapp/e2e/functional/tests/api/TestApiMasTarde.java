@@ -4,7 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import epigijon.devorapp.e2e.functional.common.BaseApiClass;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -36,8 +35,6 @@ class TestApiMasTarde extends BaseApiClass {
         deleteTestUser();
     }
 
-    @AccessMode(resID = "mas-tarde", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("POST /api/mas-tarde returns HTTP 201 with id, place_id and already_saved false")
     void testAddToMasTarde() throws IOException {
@@ -56,8 +53,6 @@ class TestApiMasTarde extends BaseApiClass {
         );
     }
 
-    @AccessMode(resID = "mas-tarde", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("POST /api/mas-tarde twice for the same place returns already_saved true on second call")
     void testAddSameRestaurantTwice() throws IOException {
@@ -74,8 +69,6 @@ class TestApiMasTarde extends BaseApiClass {
                 "Second add of same place must have already_saved true");
     }
 
-    @AccessMode(resID = "mas-tarde", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("DELETE /api/mas-tarde/{entry_id} returns HTTP 204")
     void testDeleteFromMasTarde() throws IOException {
@@ -85,8 +78,6 @@ class TestApiMasTarde extends BaseApiClass {
         Assertions.assertEquals(204, status, "DELETE mas-tarde entry must return HTTP 204");
     }
 
-    @AccessMode(resID = "mas-tarde", concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("GET /api/mas-tarde returns HTTP 200 with a JSON array")
     void testGetMasTarde() throws IOException {

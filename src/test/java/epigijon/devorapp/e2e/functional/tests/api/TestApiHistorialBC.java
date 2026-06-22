@@ -3,7 +3,6 @@ package epigijon.devorapp.e2e.functional.tests.api;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseApiClass;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -46,8 +45,6 @@ class TestApiHistorialBC extends BaseApiClass {
 
     // ── BASE: múltiples entradas devueltas ────────────────────────────────────
 
-    @AccessMode(resID = "historial", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("BASE — adding 3 history entries returns all 3 via GET /api/historial")
     void testBase_MultipleEntradas() throws IOException {
@@ -62,8 +59,6 @@ class TestApiHistorialBC extends BaseApiClass {
 
     // ── Caso 2: historial vacío → array vacío ────────────────────────────────
 
-    @AccessMode(resID = "historial", concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("Caso 2 — fresh user with no history gets an empty array")
     void testCaso2_HistorialVacio() throws IOException {
@@ -83,8 +78,6 @@ class TestApiHistorialBC extends BaseApiClass {
 
     // ── Caso 5: exactamente 1 entrada ────────────────────────────────────────
 
-    @AccessMode(resID = "historial", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 5 — adding 1 history entry returns it with id, place_id and fecha_acceso")
     void testCaso5_UnaEntrada() throws IOException {
@@ -103,8 +96,6 @@ class TestApiHistorialBC extends BaseApiClass {
 
     // ── Caso 6: eliminar entrada la quita del historial ──────────────────────
 
-    @AccessMode(resID = "historial", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 6 — deleting a history entry removes it from GET /api/historial")
     void testCaso6_EliminarEntrada() throws IOException {
@@ -128,8 +119,6 @@ class TestApiHistorialBC extends BaseApiClass {
 
     // ── Caso 3: la entrada tiene fecha_acceso (timestamp) ─────────────────────
 
-    @AccessMode(resID = "historial", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 3 — each history entry has a non-null fecha_acceso field")
     void testCaso3_FechaAcceso() throws IOException {

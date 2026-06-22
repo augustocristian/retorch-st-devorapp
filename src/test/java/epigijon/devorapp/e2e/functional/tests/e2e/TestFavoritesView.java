@@ -4,7 +4,6 @@ import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.FavoritesPage;
 import epigijon.devorapp.e2e.functional.pages.LoginPage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -82,10 +81,6 @@ class TestFavoritesView extends BaseLoggedClass {
 
     // ── 1. BASE: varias listas y varios restaurantes sin búsqueda ──────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "favoritos",   concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe mostrar varias listas y varios restaurantes sin búsqueda (BASE)")
     void testBase_VariasListasVariosRestaurantes() throws Exception {
@@ -110,10 +105,6 @@ class TestFavoritesView extends BaseLoggedClass {
 
     // ── 2. Caso 2 y Casos 3–5 condensados: sin listas, lista única, lista vacía, lista con 1 elem. ──
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "favoritos",   concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe gestionar correctamente listas vacías y unitarias (Caso 2, 3, 4, 5)")
     void testCasosVacioYUnitario() throws Exception {
@@ -155,10 +146,6 @@ class TestFavoritesView extends BaseLoggedClass {
 
     // ── 3. Caso 6: búsqueda dentro de lista filtra resultados ──────────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "favoritos",   concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe filtrar dinámicamente al buscar dentro de una lista (Caso 6)")
     void testCaso6_BusquedaDentroLista() throws Exception {

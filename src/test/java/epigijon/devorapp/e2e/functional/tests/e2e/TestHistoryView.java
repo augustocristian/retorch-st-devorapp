@@ -4,7 +4,6 @@ import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.HistoryPage;
 import epigijon.devorapp.e2e.functional.pages.LoginPage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -72,10 +71,6 @@ class TestHistoryView extends BaseLoggedClass {
 
     // ── BASE: múltiples entradas en historial ──────────────────────────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "historial",   concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("BASE — history page shows at least 1 group and multiple restaurant cards")
     void testBase_MultiplesEntradas() throws Exception {
@@ -94,10 +89,6 @@ class TestHistoryView extends BaseLoggedClass {
 
     // ── Caso 2, 3 y 5 condensados: vacío, 1 mes varios restaurantes, 1 restaurante ────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "historial",   concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe gestionar historial vacío (Caso 2), con 1 restaurante (Caso 5) y 1 mes con varios (Caso 3)")
     void testCasosVacioYUnitario() throws Exception {
@@ -134,10 +125,6 @@ class TestHistoryView extends BaseLoggedClass {
 
     // ── Caso 6: búsqueda filtra por nombre ────────────────────────────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "historial",   concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 6 — searching in history filters cards; a non-matching term shows 0 cards")
     void testCaso6_BusquedaFiltros() throws Exception {

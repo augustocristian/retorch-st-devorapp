@@ -2,7 +2,6 @@ package epigijon.devorapp.e2e.functional.tests.e2e;
 
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.RegisterPage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,8 +55,6 @@ class TestRegisterView extends BaseLoggedClass {
 
     // ── 1. Registro Exitoso - Caso BASE (BASE) ─────────────────────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe registrarse correctamente con datos válidos y redirigir a verifica correo (BASE)")
     void testRegistroExitosoBase() throws Exception {
@@ -69,11 +66,11 @@ class TestRegisterView extends BaseLoggedClass {
                 "regbase" + ts + "@devorapp.test",
                 "regbase" + (ts % 100000),
                 BASE_PASSWORD, BASE_NOMBRE, BASE_APELLIDOS);
+        injectAutocompleteMock(); // inject BEFORE step 2 mounts so the component finds window.google immediately
         reg.clickContinue().waitForStep2();
 
         Assertions.assertTrue(reg.isOnStep2(), "Must advance to step 2");
 
-        injectAutocompleteMock();
         reg.enterUbicacion("Madrid, España");
 
         new WebDriverWait(driver, Duration.ofSeconds(10))
@@ -98,9 +95,6 @@ class TestRegisterView extends BaseLoggedClass {
     //              nombre vacío (S7), apellidos vacíos (S8),
     //              contraseña vacía (S9), contraseña corta (S10).
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe validar todos los campos obligatorios en el paso 1 (S2–S10)")
     void testValidacionesPaso1() throws Exception {
@@ -203,8 +197,6 @@ class TestRegisterView extends BaseLoggedClass {
     //              contraseña sin letras backend (S13), sin números backend (S12),
     //              registro exitoso con contraseña larga (S11).
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe validar ubicación, política de contraseña backend (S12, S13, S15, S16) y registro exitoso con contraseña larga (S11)")
     void testValidacionesPaso2YPasswordLarga() throws Exception {

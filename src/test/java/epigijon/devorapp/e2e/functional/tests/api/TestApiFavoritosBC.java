@@ -3,7 +3,6 @@ package epigijon.devorapp.e2e.functional.tests.api;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseApiClass;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,8 +54,6 @@ class TestApiFavoritosBC extends BaseApiClass {
 
     // ── BASE: varias listas + varios restaurantes ─────────────────────────────
 
-    @AccessMode(resID = "favoritos", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("BASE — adding 3 restaurants to a list returns all 3 in the detail endpoint")
     void testBase_VariosRestaurantes() throws IOException {
@@ -73,8 +70,6 @@ class TestApiFavoritosBC extends BaseApiClass {
 
     // ── Caso 2: lista vacía → restaurantes array vacío ────────────────────────
 
-    @AccessMode(resID = "favoritos", concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 2 — a new list has an empty restaurantes array")
     void testCaso2_ListaVacia() throws IOException {
@@ -87,8 +82,6 @@ class TestApiFavoritosBC extends BaseApiClass {
 
     // ── Caso 3: lista con 1 restaurante ──────────────────────────────────────
 
-    @AccessMode(resID = "favoritos", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 3 — adding 1 restaurant returns a restaurantes array of size 1")
     void testCaso3_UnRestaurante() throws IOException {
@@ -106,8 +99,6 @@ class TestApiFavoritosBC extends BaseApiClass {
 
     // ── Caso 4: GET /api/favoritos/listas devuelve las listas del usuario ─────
 
-    @AccessMode(resID = "favoritos", concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 4 — GET /api/favoritos/listas returns a non-empty array with the created list")
     void testCaso4_GetListas() throws IOException {
@@ -128,8 +119,6 @@ class TestApiFavoritosBC extends BaseApiClass {
 
     // ── Caso 5: eliminar un restaurante lo quita del detalle ─────────────────
 
-    @AccessMode(resID = "favoritos", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 5 — deleting a restaurant removes it from the list detail")
     void testCaso5_EliminarRestaurante() throws IOException {
@@ -153,8 +142,6 @@ class TestApiFavoritosBC extends BaseApiClass {
 
     // ── Caso 6: eliminar lista la quita de la colección ──────────────────────
 
-    @AccessMode(resID = "favoritos", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",      concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Caso 6 — deleting a list removes it from GET /api/favoritos/listas")
     void testCaso6_EliminarLista() throws IOException {

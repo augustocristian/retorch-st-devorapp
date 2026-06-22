@@ -4,7 +4,6 @@ import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.HistoryPage;
 import epigijon.devorapp.e2e.functional.pages.LoginPage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -92,11 +91,11 @@ class TestRatingView extends BaseLoggedClass {
                 .findFirst()
                 .orElseThrow(() -> new org.openqa.selenium.NoSuchElementException(
                         "Aspect row not found: " + aspect));
-        List<WebElement> svgs = row.findElements(By.tagName("svg"));
-        // Always click the max star first (to clear any pre-filled state from a previous submission),
-        // then click the target star. This handles toggle-behaviour in star rating components.
-        if (svgs.size() >= 5) svgs.get(4).click(); // ensure max is set first
-        if (stars < 5 && stars <= svgs.size()) svgs.get(stars - 1).click(); // then set target
+        WebElement starsContainer = row.findElement(By.xpath("./div[2]"));
+        List<WebElement> svgs = starsContainer.findElements(By.tagName("svg"));
+        if (stars <= svgs.size()) {
+            svgs.get(stars - 1).click();
+        }
     }
 
     private boolean isSubmitEnabled() {
@@ -126,11 +125,6 @@ class TestRatingView extends BaseLoggedClass {
 
     // ── 1. BASE: todos los aspectos al máximo con comentario ─────────────────────────
 
-    @AccessMode(resID = "web-browser",  concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",     concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "historial",    concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe guardar la valoración con todos los aspectos al máximo y comentario (BASE)")
     void testGuardarValoracionCompletaBase() throws Exception {
@@ -143,11 +137,6 @@ class TestRatingView extends BaseLoggedClass {
 
     // ── 2. S2, S5, S8, S11 + S14: 0 estrellas deshabilitan el botón; comentario vacío permitido ──
 
-    @AccessMode(resID = "web-browser",  concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",     concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "historial",    concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe deshabilitar envío con 0 estrellas en cualquier aspecto (S2, S5, S8, S11) y aceptar comentario vacío (S14)")
     void testValidarCeroEstrellasYComentarioVacio() throws Exception {
@@ -189,11 +178,6 @@ class TestRatingView extends BaseLoggedClass {
 
     // ── 3. S3, S4, S6, S7, S9, S10, S12, S13: puntuaciones variables ─────────────────
 
-    @AccessMode(resID = "web-browser",  concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",     concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "valoraciones", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "historial",    concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "user",         concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("debe guardar valoraciones con puntuaciones variables de calidad, precio, higiene y trato (S3, S4, S6, S7, S9, S10, S12, S13)")
     void testPuntuacionesVariables() throws Exception {

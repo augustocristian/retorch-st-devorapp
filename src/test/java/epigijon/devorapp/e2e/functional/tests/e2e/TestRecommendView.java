@@ -3,7 +3,6 @@ package epigijon.devorapp.e2e.functional.tests.e2e;
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.LoginPage;
 import epigijon.devorapp.e2e.functional.pages.RecommendPage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -65,9 +64,6 @@ class TestRecommendView extends BaseLoggedClass {
 
     // ── 1. BASE + S8: búsqueda con filtros base (ubicación preferida y alternativa) ────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("BASE — búsqueda con filtros base y ubicación preferida/alternativa (BASE, S8)")
     void testBase_BusquedaFiltrosBaseYUbicacionAlternativa() throws Exception {
@@ -107,9 +103,6 @@ class TestRecommendView extends BaseLoggedClass {
 
     // ── 2. S2, S4, S6, S7: filtros opcionales sin categorías ni precio, booleanos en falso ─
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S2, S4, S6, S7 — búsqueda sin categorías ni precio y con booleanos en false")
     void testFiltrosOpcionales() throws Exception {
@@ -134,9 +127,6 @@ class TestRecommendView extends BaseLoggedClass {
 
     // ── 3. S9: ubicación alternativa vacía → error de validación ──────────────────────
 
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S9 — seleccionar 'otra ubicación' vacía bloquea la búsqueda con un error")
     void testS9_OtraUbicacionVacia() throws Exception {

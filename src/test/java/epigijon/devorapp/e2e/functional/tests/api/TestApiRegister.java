@@ -2,7 +2,6 @@ package epigijon.devorapp.e2e.functional.tests.api;
 
 import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseApiClass;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -46,7 +45,6 @@ class TestApiRegister extends BaseApiClass {
 
     // ── BASE: registro exitoso devuelve HTTP 201 ──────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("BASE — valid registration returns HTTP 201 with user object")
     void testBase_RegistroExitoso() throws IOException {
@@ -61,7 +59,6 @@ class TestApiRegister extends BaseApiClass {
 
     // ── S3: correo ya registrado → error 400 ─────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("S3 — registering with a duplicate email returns HTTP 400")
     void testS3_EmailDuplicado() throws IOException {
@@ -84,7 +81,6 @@ class TestApiRegister extends BaseApiClass {
 
     // ── Check-availability: correo libre / en uso ─────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("check-availability — email free returns email_taken=false; after registration email_taken=true")
     void testCheckAvailabilityEmail() throws IOException {
@@ -109,7 +105,6 @@ class TestApiRegister extends BaseApiClass {
 
     // ── Check-availability: username libre / en uso ───────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("check-availability — username free returns username_taken=false; after registration username_taken=true")
     void testCheckAvailabilityUsername() throws IOException {
@@ -131,7 +126,6 @@ class TestApiRegister extends BaseApiClass {
 
     // ── S7: login con credenciales correctas → HTTP 200 ──────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("S7 — login with correct credentials returns HTTP 200")
     void testS7_LoginCorrecto() throws IOException {
@@ -149,7 +143,6 @@ class TestApiRegister extends BaseApiClass {
 
     // ── S8: login con contraseña incorrecta → HTTP 401 ───────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("S8 — login with wrong password returns HTTP 401")
     void testS8_LoginContrasenaIncorrecta() throws IOException {

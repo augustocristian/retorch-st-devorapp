@@ -2,7 +2,6 @@ package epigijon.devorapp.e2e.functional.tests.e2e;
 
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.LoginPage;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -46,9 +45,6 @@ class TestLogin extends BaseLoggedClass {
     /**
      * BASE / S7 — valid credentials redirect the user to /home.
      */
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("Valid credentials redirect the user to the home page (BASE / S7 - Happy Path)")
     void testSuccessfulLogin() throws Exception {
@@ -73,9 +69,6 @@ class TestLogin extends BaseLoggedClass {
      *   <li>S8: correct identifier, wrong password → «Credenciales incorrectas».</li>
      * </ul>
      */
-    @AccessMode(resID = "web-browser", concurrency = 1, sharing = false, accessMode = "READWRITE")
-    @AccessMode(resID = "frontend",    concurrency = 1, sharing = false, accessMode = "READONLY")
-    @AccessMode(resID = "user",        concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("Empty fields (BASE, S3–S6) and wrong password (S8) trigger validation errors")
     void testLoginValidationErrors() throws Exception {

@@ -2,7 +2,6 @@ package epigijon.devorapp.e2e.functional.tests.api;
 
 import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseApiClass;
-import giis.retorch.annotations.AccessMode;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -45,7 +44,6 @@ class TestApiProfileBC extends BaseApiClass {
 
     // ── BASE: GET /api/me devuelve los datos del usuario ──────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("BASE — GET /api/me returns the authenticated user's username and email")
     void testBase_GetMe() throws IOException {
@@ -61,7 +59,6 @@ class TestApiProfileBC extends BaseApiClass {
 
     // ── S2+S3: actualizar nombre y apellidos ──────────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("S2+S3 — PATCH /api/profile updates nombre and apellidos; GET /api/me reflects them")
     void testS2S3_ActualizarNombreApellidos() throws IOException {
@@ -83,7 +80,6 @@ class TestApiProfileBC extends BaseApiClass {
 
     // ── S8: contraseña incorrecta al cambiar email → HTTP 401 ────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S8 — PATCH /api/profile/email with wrong password returns HTTP 401")
     void testS8_ContrasenaWrongParaEmail() throws IOException {
@@ -98,7 +94,6 @@ class TestApiProfileBC extends BaseApiClass {
 
     // ── S10: contraseña actual incorrecta al cambiar contraseña → HTTP 400 ───
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S10 — PATCH /api/profile/password with wrong current password returns HTTP 400")
     void testS10_ContrasenaActualIncorrecta() throws IOException {
@@ -113,7 +108,6 @@ class TestApiProfileBC extends BaseApiClass {
 
     // ── S13: contraseña nueva muy corta → HTTP 400 ───────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READONLY")
     @Test
     @DisplayName("S13 — PATCH /api/profile/password with new password < 8 chars returns HTTP 400")
     void testS13_NuevaContrasenaMuyCorta() throws IOException {
@@ -128,7 +122,6 @@ class TestApiProfileBC extends BaseApiClass {
 
     // ── S14: cambio de contraseña correcto → HTTP 200 ────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("S14 — PATCH /api/profile/password with valid credentials returns HTTP 200")
     void testS14_CambioContrasenaOk() throws IOException {
@@ -150,7 +143,6 @@ class TestApiProfileBC extends BaseApiClass {
 
     // ── S17: eliminar cuenta → GET /api/me → 401 ─────────────────────────────
 
-    @AccessMode(resID = "user", concurrency = 1, sharing = false, accessMode = "READWRITE")
     @Test
     @DisplayName("S17 — DELETE /api/profile removes the account; subsequent GET /api/me returns 401")
     void testS17_EliminarCuenta() throws IOException {
