@@ -70,6 +70,8 @@ class TestRecommendView extends BaseLoggedClass {
         // BASE: preferred location + multiple categories + multiple prices
         RecommendPage page = loginAndGoToRecommend();
         page.addCategory("Mexicano", "Mexicano");
+        page.addCategory("Italiano", "Italiano");
+        page.clickPrice("€");
         page.clickPrice("€€");
         page.setIncludeNoPrice(true);
         page.setOpenNow(true);
@@ -123,24 +125,100 @@ class TestRecommendView extends BaseLoggedClass {
         page.search();
         Assertions.assertFalse(page.hasErrorMessage(),
                 "S6/S7: unchecking boolean filters must not produce a validation error");
+
+        // S3: 1 category, multiple prices
+        driver.get(sutUrl + "/recommend-restaurants");
+        page = new RecommendPage(driver, waiter);
+        page.addCategory("Mexicano", "Mexicano");
+        page.clickPrice("€");
+        page.clickPrice("€€");
+        page.selectPreferredLocation();
+        page.search();
+        Assertions.assertFalse(page.hasErrorMessage(),
+                "S3: searching with 1 category and multiple prices must not produce an error");
+
+        // S5: multiple categories, 1 price
+        driver.get(sutUrl + "/recommend-restaurants");
+        page = new RecommendPage(driver, waiter);
+        page.addCategory("Mexicano", "Mexicano");
+        page.addCategory("Italiano", "Italiano");
+        page.clickPrice("€");
+        page.selectPreferredLocation();
+        page.search();
+        Assertions.assertFalse(page.hasErrorMessage(),
+                "S5: searching with multiple categories and 1 price must not produce an error");
     }
 
     // ── 3. S9: ubicación alternativa vacía → error de validación ──────────────────────
 
     @Test
-    @DisplayName("S9 — seleccionar 'otra ubicación' vacía bloquea la búsqueda con un error")
+    @DisplayName("S9, S10, S11 — validación de otra ubicación vacía (S9), y control de resultados 0 (S10) y 1 (S11)")
     void testS9_OtraUbicacionVacia() throws Exception {
-        RecommendPage page = loginAndGoToRecommend();
-        page.addCategory("Mexicano", "Mexicano");
-        page.selectOtherLocation(""); // empty location
-        page.search();
+        // 1. S9: empty alternate location
+        RecommendPage pageS9 = loginAndGoToRecommend();
+        pageS9.addCategory("Mexicano", "Mexicano");
+        pageS9.selectOtherLocation(""); // empty location
+        pageS9.search();
 
         Assertions.assertAll(
-                () -> Assertions.assertTrue(page.hasErrorMessage(),
+                () -> Assertions.assertTrue(pageS9.hasErrorMessage(),
                         "Searching without a location when 'otra ubicación' is selected must show an error"),
                 () -> Assertions.assertTrue(
-                        page.getErrorMessage().toLowerCase().contains("ubicación") ||
-                        page.getErrorMessage().toLowerCase().contains("localiz"),
+                        pageS9.getErrorMessage().toLowerCase().contains("ubicación") ||
+                        pageS9.getErrorMessage().toLowerCase().contains("localiz"),
                         "Error message must mention location"));
+
+        // 2. S10: 0 results (using fetch mock)
+        driver.get(sutUrl + "/recommend-restaurants");
+        RecommendPage pageS10 = new RecommendPage(driver, waiter);
+        pageS10.addCategory("Mexicano", "Mexicano");
+        pageS10.selectPreferredLocation();
+
+        // Inject fetch mock for 0 results
+        ((JavascriptExecutor) driver).executeScript(
+            "window.originalFetch = window.fetch; " +
+            "window.fetch = function(input, init) { " +
+            "  if (typeof input === 'string' && input.includes('/api/recommendations/search')) { " +
+            "    return Promise.resolve(new Response(JSON.stringify({ results: [], next_page_token: null }), { status: 200, headers: { 'Content-Type': 'application/json' } })); " +
+            "  } " +
+            "  return window.originalFetch(input, init); " +
+            "};"
+        );
+
+        pageS10.search();
+        // Wait a bit to ensure UI handles it and verify result count is 0
+        new WebDriverWait(driver, Duration.ofSeconds(5))
+                .until(d -> d.findElements(org.openqa.selenium.By.cssSelector(".suggestion-card")).size() == 0);
+        Assertions.assertEquals(0, pageS10.getResultCount(), "S10: result count must be 0");
+        // Restore fetch
+        ((JavascriptExecutor) driver).executeScript("window.fetch = window.originalFetch;");
+
+        // 3. S11: 1 result (using fetch mock)
+        driver.get(sutUrl + "/recommend-restaurants");
+        RecommendPage pageS11 = new RecommendPage(driver, waiter);
+        pageS11.addCategory("Mexicano", "Mexicano");
+        pageS11.selectPreferredLocation();
+
+        // Inject fetch mock for 1 result
+        ((JavascriptExecutor) driver).executeScript(
+            "window.originalFetch = window.fetch; " +
+            "window.fetch = function(input, init) { " +
+            "  if (typeof input === 'string' && input.includes('/api/recommendations/search')) { " +
+            "    return Promise.resolve(new Response(JSON.stringify({ " +
+            "      results: [{ id: 'test_place_11', name: 'Restaurante S11', rating: 4.0, user_ratings_total: 10, types: ['restaurant'], address: 'Calle 11', main_photo: null, summary: 'S11', open_now: true }], " +
+            "      next_page_token: null " +
+            "    }), { status: 200, headers: { 'Content-Type': 'application/json' } })); " +
+            "  } " +
+            "  return window.originalFetch(input, init); " +
+            "};"
+        );
+
+        pageS11.search();
+        // Wait for card to appear
+        new WebDriverWait(driver, Duration.ofSeconds(5))
+                .until(d -> d.findElements(org.openqa.selenium.By.cssSelector(".suggestion-card")).size() == 1);
+        Assertions.assertEquals(1, pageS11.getResultCount(), "S11: result count must be 1");
+        // Restore fetch
+        ((JavascriptExecutor) driver).executeScript("window.fetch = window.originalFetch;");
     }
 }

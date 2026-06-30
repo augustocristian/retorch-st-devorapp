@@ -23,9 +23,9 @@ import java.time.Duration;
  *
  * <p>Base-Choice coverage:
  * <ul>
- *   <li>BASE — profile data loads correctly.</li>
- *   <li>S2–S4, Caso 2, 18 — cancel/save personal info, bad and good location update.</li>
- *   <li>S5–S9, Caso 3 — email change validations and happy path.</li>
+ *   <li>BASE — profile data loads correctly and invalid location update is validated (Ubicación = Mal).</li>
+ *   <li>S2–S4 — save personal info (Nombre = Si, Apellidos = Si) and valid location update (Ubicación = Bien).</li>
+ *   <li>S5–S9 — email change validations and happy path.</li>
  *   <li>S10–S16 — password change validations and happy path.</li>
  *   <li>S17 — account deletion.</li>
  * </ul>
@@ -63,10 +63,10 @@ class TestProfileView extends BaseLoggedClass {
         return page;
     }
 
-    // ── 1. Carga inicial + Gestión de Información Personal y Ubicación (BASE, S2–S4, Caso 2, 18) ───
+    // ── 1. Carga inicial + Gestión de Información Personal y Ubicación (BASE, S2–S4) ───
 
     @Test
-    @DisplayName("debe cargar datos y gestionar información personal y ubicación (BASE, S2, S3, S4, Caso 2, 18)")
+    @DisplayName("BASE, S2, S3, S4 — el perfil permite cargar y gestionar la información personal y la ubicación")
     void testCargarYGestionarInformacionPersonalYUbicacion() throws Exception {
         // Register a dedicated user to avoid cross-test pollution when mutating profile data
         long ts = System.currentTimeMillis();
@@ -94,13 +94,13 @@ class TestProfileView extends BaseLoggedClass {
 
         injectAutocompleteMock();
 
-        // Caso 2: Cancel personal edit restores original values
+        // Cancel personal edit restores original values
         page.editPersonalInfo()
                 .fillInputInCard("Información Personal", 0, "JuanModificado")
                 .fillInputInCard("Información Personal", 1, "PérezModificado")
                 .cancelPersonalInfo();
         Assertions.assertTrue(page.getCardText("Información Personal").contains("UITester"),
-                "Caso 2: cancel must restore original name");
+                "Cancel must restore original name");
 
         // S2 & S3: Save updated nombre/apellidos
         page.editPersonalInfo()
@@ -114,14 +114,14 @@ class TestProfileView extends BaseLoggedClass {
         Assertions.assertTrue(personalCardText.contains("Juan"),  "S2: card must contain updated name");
         Assertions.assertTrue(personalCardText.contains("Pérez"), "S3: card must contain updated surname");
 
-        // 18: Type location manually without selecting → error
+        // BASE: Type location manually without selecting → error (Ubicación = Mal)
         page.clickButtonInCard("Ubicación Preferida", "Cambiar")
                 .fillInputInCard("Ubicación Preferida", 0, "aifgauif")
                 .clickButtonInCard("Ubicación Preferida", "Guardar cambios");
         Assertions.assertTrue(page.getCardText("Ubicación Preferida").contains("Debes seleccionar una ubicación válida"),
-                "18: manual-typed location must show inline error");
+                "BASE: manual-typed location must show inline error");
 
-        // S4: Select location from autocomplete list
+        // S4: Select location from autocomplete list (Ubicación = Bien)
         page.fillInputInCard("Ubicación Preferida", 0, "Barcelona, España");
         new WebDriverWait(driver, Duration.ofSeconds(10))
                 .until(d -> (Boolean) ((JavascriptExecutor) d).executeScript(
@@ -139,11 +139,10 @@ class TestProfileView extends BaseLoggedClass {
                         "Barcelona, España"));
     }
 
-    // ── 2. Gestión de Correo y Contraseña (S5–S16, Caso 3) ──────────────────────────
-    //    Condensa: validaciones de email (S5–S9, Caso 3) y de password (S10–S16).
+    // ── 2. Gestión de Correo y Contraseña (S5–S16) ──────────────────────────
 
     @Test
-    @DisplayName("debe validar y permitir cambiar el correo (S5–S9, Caso 3) y la contraseña (S10–S16)")
+    @DisplayName("S5 a S16 — validación y cambio de correo electrónico y contraseña")
     void testGestionarCorreoYContrasena() throws Exception {
         long ts = System.currentTimeMillis();
 
@@ -186,15 +185,15 @@ class TestProfileView extends BaseLoggedClass {
         Assertions.assertTrue(page.hasErrorToast(), "S6: error toast must appear for email in use");
         page.dismissErrorToast();
 
-        // Caso 3: successful email change
+        // Happy path: successful email change
         String newEmail = "newtempemail" + ts + "@devorapp.test";
         page.fillNewEmail(newEmail).fillEmailPassword(emailUserPassword).submitEmailChange();
         waiter.waitForToast("success");
-        Assertions.assertTrue(page.hasSuccessToast(), "Caso 3: success toast must appear");
+        Assertions.assertTrue(page.hasSuccessToast(), "Success toast must appear");
         Assertions.assertTrue(page.getSuccessToastText().contains("confirmación"),
-                "Caso 3: toast must mention confirmation");
+                "Toast must mention confirmation");
         Assertions.assertTrue(page.getCardText("Correo Electrónico").contains(emailUserEmail),
-                "Caso 3: card must still display original email");
+                "Card must still display original email");
 
         // ── Password section ────────────────────────────────────────────────────────
         long ts2 = System.currentTimeMillis();
@@ -253,8 +252,8 @@ class TestProfileView extends BaseLoggedClass {
     // ── 3. Eliminar Cuenta (S17) ──────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("debe eliminar la cuenta tras escribir CONFIRMAR y redirigir a login (S17)")
-    void testEliminarCuenta_S17() throws Exception {
+    @DisplayName("S17 — eliminación de cuenta tras validación de confirmación")
+    void testEliminarCuenta() throws Exception {
         long ts = System.currentTimeMillis();
         String delEmail    = "delui" + ts + "@devorapp.test";
         String delUsername = "delui" + (ts % 100000);

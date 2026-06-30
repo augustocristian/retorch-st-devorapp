@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Base-Choice coverage:
  * <ul>
- *   <li>BASE / Caso 2 — tema claro (BASE) activa data-theme='light'; tema oscuro (Caso 2) elimina el atributo.
- *                        La letra M está activa por defecto en ambos casos.</li>
- *   <li>Caso 3 / Caso 4 — letra S y letra L se aplican correctamente junto con tema claro.</li>
+ *   <li>BASE / S2 — tema claro (BASE) activa data-theme='light'; tema oscuro (S2) elimina el atributo.
+ *                     La letra M está activa por defecto en ambos casos.</li>
+ *   <li>S3 / S4   — letra S y letra L se aplican correctamente junto con tema claro.</li>
  * </ul>
  */
 class TestSideMenu extends BaseLoggedClass {
@@ -45,10 +45,10 @@ class TestSideMenu extends BaseLoggedClass {
         return new SideMenuPage(driver, waiter).open();
     }
 
-    // ── 1. BASE + Caso 2: selección de tema (Claro y Oscuro) ─────────────────────────
+    // ── 1. BASE + S2: selección de tema (Claro y Oscuro) ─────────────────────────
 
     @Test
-    @DisplayName("BASE y Caso 2 — el tema Claro activa data-theme='light' y el Oscuro lo elimina; letra M activa por defecto")
+    @DisplayName("BASE y S2 — el tema Claro activa data-theme='light' y el Oscuro lo elimina; letra M activa por defecto")
     void testSeleccionTema() throws Exception {
         // BASE: tema Claro, letra M por defecto
         SideMenuPage menu = loginAndOpenMenu();
@@ -64,50 +64,50 @@ class TestSideMenu extends BaseLoggedClass {
                         "BASE: M font-size must be active by default")
         );
 
-        // Caso 2: tema Oscuro
+        // S2: tema Oscuro
         menu.clickTheme("Oscuro");
         Assertions.assertAll(
                 () -> Assertions.assertTrue(menu.isThemeActive("Oscuro"),
-                        "Caso 2: 'Oscuro' button must have the active class after clicking"),
+                        "S2: 'Oscuro' button must have the active class after clicking"),
                 () -> Assertions.assertFalse(menu.isThemeActive("Claro"),
-                        "Caso 2: 'Claro' button must not be active"),
+                        "S2: 'Claro' button must not be active"),
                 () -> Assertions.assertEquals("", menu.getHtmlDataTheme(),
-                        "Caso 2: dark mode must have no data-theme attribute on <html>")
+                        "S2: dark mode must have no data-theme attribute on <html>")
         );
     }
 
-    // ── 2. Caso 3 + Caso 4: selección de tamaño de letra (S y L) ────────────────────
+    // ── 2. S3 + S4: selección de tamaño de letra (S y L) ────────────────────
 
     @Test
-    @DisplayName("Caso 3 y Caso 4 — la letra S y la letra L se aplican correctamente con tema Claro")
+    @DisplayName("S3 y S4 — la letra S y la letra L se aplican correctamente con tema Claro")
     void testSeleccionTamanoLetra() throws Exception {
         SideMenuPage menu = loginAndOpenMenu();
         menu.clickTheme("Claro");
 
-        // Caso 3: letra S
+        // S3: letra S
         menu.clickFontSize("S");
         Assertions.assertAll(
                 () -> Assertions.assertEquals("light", menu.getHtmlDataTheme(),
-                        "Caso 3: data-theme must be 'light'"),
+                        "S3: data-theme must be 'light'"),
                 () -> Assertions.assertTrue(menu.isFontSizeActive("S"),
-                        "Caso 3: 'S' font-size button must be active"),
+                        "S3: 'S' font-size button must be active"),
                 () -> Assertions.assertFalse(menu.isFontSizeActive("M"),
-                        "Caso 3: 'M' font-size button must not be active"),
+                        "S3: 'M' font-size button must not be active"),
                 () -> Assertions.assertEquals("S", menu.getHtmlDataFontSize(),
-                        "Caso 3: data-font-size must be 'S'")
+                        "S3: data-font-size must be 'S'")
         );
 
-        // Caso 4: letra L
+        // S4: letra L
         menu.clickFontSize("L");
         Assertions.assertAll(
                 () -> Assertions.assertEquals("light", menu.getHtmlDataTheme(),
-                        "Caso 4: data-theme must still be 'light'"),
+                        "S4: data-theme must still be 'light'"),
                 () -> Assertions.assertTrue(menu.isFontSizeActive("L"),
-                        "Caso 4: 'L' font-size button must be active"),
+                        "S4: 'L' font-size button must be active"),
                 () -> Assertions.assertFalse(menu.isFontSizeActive("M"),
-                        "Caso 4: 'M' font-size button must not be active"),
+                        "S4: 'M' font-size button must not be active"),
                 () -> Assertions.assertEquals("L", menu.getHtmlDataFontSize(),
-                        "Caso 4: data-font-size must be 'L'")
+                        "S4: data-font-size must be 'L'")
         );
     }
 }

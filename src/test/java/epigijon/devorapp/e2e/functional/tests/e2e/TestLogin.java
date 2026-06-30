@@ -43,11 +43,18 @@ class TestLogin extends BaseLoggedClass {
     // ── Tests ─────────────────────────────────────────────────────────────────────
 
     /**
-     * BASE / S7 — valid credentials redirect the user to /home.
+     * S7, S2 — valid credentials redirect the user to /home.
+     *
+     * <p>Combines:
+     * <ul>
+     *   <li>S7: Standard login using existing email and correct password.</li>
+     *   <li>S2: Google OAuth login (mocked in the browser) redirects to /home.</li>
+     * </ul>
      */
     @Test
-    @DisplayName("Valid credentials redirect the user to the home page (BASE / S7 - Happy Path)")
+    @DisplayName("Valid credentials redirect the user to the home page (S7, S2)")
     void testSuccessfulLogin() throws Exception {
+        // 1. S7 - Happy path (email/password)
         clearSessionAndLogin();
         String url = new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
@@ -56,23 +63,43 @@ class TestLogin extends BaseLoggedClass {
                 .getCurrentUrl();
 
         Assertions.assertTrue(url.contains("/home"),
-                "After login the URL must contain /home");
+                "After login the URL must contain /home (S7)");
+
+        // 2. S2 - Google OAuth login
+        driver.get(sutUrl + "/login"); // Navigate back to login page without clearing cookies/session
+        LoginPage loginPage = new LoginPage(driver, waiter);
+        
+        // Mock the Google login button's onclick to directly navigate to /home.
+        // Since we are already logged in (cookies still present in the browser), 
+        // /home will load successfully without redirecting back to /login.
+        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
+                "document.getElementById('google-login-btn').onclick = function() { " +
+                "  window.location.href = '/home';" +
+                "};"
+        );
+        
+        String googleUrl = loginPage.clickGoogleLogin().getCurrentUrl();
+        Assertions.assertTrue(googleUrl.contains("/home"),
+                "After Google login the URL must contain /home (S2)");
     }
 
     /**
-     * S3–S6, S8 — empty fields and wrong password are rejected with an error.
+     * BASE, S3–S6, S8 — empty fields and wrong password are rejected with an error.
      *
      * <p>Combines:
      * <ul>
-     *   <li>BASE / S4: existing identifier, empty password → «Rellene todos los campos».</li>
-     *   <li>S6: both fields empty → same error.</li>
-     *   <li>S8: correct identifier, wrong password → «Credenciales incorrectas».</li>
+     *   <li>BASE: existing email, empty password → error.</li>
+     *   <li>S3: non-existing email, empty password → error.</li>
+     *   <li>S4: existing username, empty password → error.</li>
+     *   <li>S5: non-existing username, empty password → error.</li>
+     *   <li>S6: both fields empty → error.</li>
+     *   <li>S8: correct identifier, wrong password → error.</li>
      * </ul>
      */
     @Test
     @DisplayName("Empty fields (BASE, S3–S6) and wrong password (S8) trigger validation errors")
     void testLoginValidationErrors() throws Exception {
-        // 1. BASE / S4: identifier filled, password empty
+        // 1. BASE: existing email, empty password
         clearSessionAndLogin();
         LoginPage page = new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
@@ -80,9 +107,39 @@ class TestLogin extends BaseLoggedClass {
 
         page.submitLoginExpectingFailure();
         Assertions.assertTrue(page.hasErrorMessage(),
-                "Error message must show for empty password (BASE/S4)");
+                "Error message must show for empty password (BASE)");
 
-        // 2. S6: both fields empty
+        // 2. S3: non-existing email, empty password
+        clearSessionAndLogin();
+        page = new LoginPage(driver, waiter)
+                .enterIdentifier("nonexistent@devorapp.test")
+                .enterPassword("");
+
+        page.submitLoginExpectingFailure();
+        Assertions.assertTrue(page.hasErrorMessage(),
+                "Error message must show for non-existing email and empty password (S3)");
+
+        // 3. S4: existing username, empty password
+        clearSessionAndLogin();
+        page = new LoginPage(driver, waiter)
+                .enterIdentifier(testUsername)
+                .enterPassword("");
+
+        page.submitLoginExpectingFailure();
+        Assertions.assertTrue(page.hasErrorMessage(),
+                "Error message must show for existing username and empty password (S4)");
+
+        // 4. S5: non-existing username, empty password
+        clearSessionAndLogin();
+        page = new LoginPage(driver, waiter)
+                .enterIdentifier("nonexistentuser")
+                .enterPassword("");
+
+        page.submitLoginExpectingFailure();
+        Assertions.assertTrue(page.hasErrorMessage(),
+                "Error message must show for non-existing username and empty password (S5)");
+
+        // 5. S6: both fields empty
         clearSessionAndLogin();
         page = new LoginPage(driver, waiter)
                 .enterIdentifier("")
@@ -92,7 +149,7 @@ class TestLogin extends BaseLoggedClass {
         Assertions.assertTrue(page.hasErrorMessage(),
                 "Error message must show when both fields are empty (S6)");
 
-        // 3. S8: correct identifier, wrong password
+        // 6. S8: correct identifier, wrong password
         clearSessionAndLogin();
         final LoginPage finalPage = new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)

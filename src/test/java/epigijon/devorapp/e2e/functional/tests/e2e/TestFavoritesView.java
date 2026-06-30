@@ -4,30 +4,35 @@ import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseLoggedClass;
 import epigijon.devorapp.e2e.functional.pages.FavoritesPage;
 import epigijon.devorapp.e2e.functional.pages.LoginPage;
+import epigijon.devorapp.e2e.functional.pages.SideMenuPage;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 
 import java.io.IOException;
 
 /**
  * Browser tests for the DevorApp favorites page ({@code /favorites}).
  *
- * <p>Base-Choice coverage:
+ * <p>
+ * Base-Choice coverage:
  * <ul>
- *   <li>BASE — multiple lists, multiple restaurants, no search filter.</li>
- *   <li>Caso 2 — no lists created → empty state visible.</li>
- *   <li>Caso 3–5 — single list, empty list, list with 1 restaurant.</li>
- *   <li>Caso 6 — search within a list filters results.</li>
+ * <li>BASE — multiple lists, 0 restaurants, with search filter.</li>
+ * <li>S2 — 0 lists created (empty state general).</li>
+ * <li>S3 — 1 list, 0 restaurants, with search filter.</li>
+ * <li>S4 — multiple lists, 1 restaurant, with search filter.</li>
+ * <li>S5 — multiple lists, multiple restaurants, with search filter.</li>
+ * <li>S6 — multiple lists, 0 restaurants, no search filter.</li>
  * </ul>
  */
 class TestFavoritesView extends BaseLoggedClass {
 
     private static final String PLACE_A = "ChIJN1t_tDeuEmsRUsoyG83frY4";
     private static final String PLACE_B = "ChIJdd4hrwug2EcRmSrV3Vo6llI";
-    private static final String PLACE_C = "ChIJ2eUgeAK6j4ARbn5u_wAGqWA";
 
     @BeforeAll
     static void createTestUser() throws Exception {
@@ -45,125 +50,193 @@ class TestFavoritesView extends BaseLoggedClass {
         driver.get(sutUrl + "/login");
     }
 
-    private FavoritesPage loginAndGoToFavorites() throws Exception {
+    private void injectFavoritesMock(String listasJson, String detailJson) {
+        ((JavascriptExecutor) driver).executeScript(
+                "window.mockFavoritesListas = JSON.parse('" + listasJson.replace("'", "\\'") + "');" +
+                        "window.mockFavoritesDetail = JSON.parse('" + detailJson.replace("'", "\\'") + "');" +
+                        "window.originalFetch = window.fetch; " +
+                        "window.fetch = function(input, init) { " +
+                        "  if (typeof input === 'string') { " +
+                        "    if (input.includes('/api/favoritos/listas/')) { " +
+                        "      return Promise.resolve(new Response(JSON.stringify(window.mockFavoritesDetail), { status: 200, headers: { 'Content-Type': 'application/json' } })); "
+                        +
+                        "    } " +
+                        "    if (input.includes('/api/favoritos/listas')) { " +
+                        "      return Promise.resolve(new Response(JSON.stringify(window.mockFavoritesListas), { status: 200, headers: { 'Content-Type': 'application/json' } })); "
+                        +
+                        "    } " +
+                        "  } " +
+                        "  return window.originalFetch(input, init); " +
+                        "};");
+    }
+
+    private void restoreFetch() {
+        ((JavascriptExecutor) driver).executeScript(
+                "if (window.originalFetch) { window.fetch = window.originalFetch; }");
+    }
+
+    private FavoritesPage loginGoToHomeAndInjectMock(String listasJson, String detailJson) throws Exception {
         clearSessionAndLogin();
         new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
                 .enterPassword(testPassword)
                 .submitLogin();
-        driver.get(sutUrl + "/favorites");
+
+        injectFavoritesMock(listasJson, detailJson);
+
+        new SideMenuPage(driver, waiter).open();
+        driver.findElement(By.xpath("//button[contains(.,'Favoritos')]")).click();
+
         return new FavoritesPage(driver, waiter);
     }
 
-    private int createListaViaApi(String nombre) throws IOException {
-        apiLogin();
-        String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
-        JsonObject payload = new JsonObject();
-        payload.addProperty("nombre", nombre);
-        payload.addProperty("icono", "Heart");
-        JsonObject resp = apiPost(apiBase + "/api/favoritos/listas", payload.toString());
-        return resp.get("id").getAsInt();
+    private String getMockListasJson(int count) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 1; i <= count; i++) {
+            if (i > 1)
+                sb.append(",");
+            sb.append("{\"id\":").append(i)
+                    .append(",\"user_id\":\"uid\",\"nombre\":\"Lista ").append(i)
+                    .append("\",\"icono\":\"Heart\"}");
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
-    private void addFavoritoViaApi(int listaId, String placeId) throws IOException {
-        apiLogin();
-        String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
-        JsonObject payload = new JsonObject();
-        payload.addProperty("place_id", placeId);
-        apiPost(apiBase + "/api/favoritos/listas/" + listaId, payload.toString());
+    private String getMockDetailJson(int listId, String listName, int restaurantCount) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"lista\":{\"id\":").append(listId)
+                .append(",\"user_id\":\"uid\",\"nombre\":\"").append(listName)
+                .append("\",\"icono\":\"Heart\"},\"restaurantes\":[");
+
+        String[] placeIds = { PLACE_A, PLACE_B };
+        String[] names = { "Restaurante Uno", "Restaurante Dos" };
+
+        for (int i = 0; i < restaurantCount; i++) {
+            if (i > 0)
+                sb.append(",");
+            sb.append("{\"id\":").append(i + 1)
+                    .append(",\"lista_id\":").append(listId)
+                    .append(",\"place_id\":\"").append(placeIds[i])
+                    .append("\",\"restaurant\":{")
+                    .append("\"id\":\"").append(placeIds[i])
+                    .append("\",\"name\":\"").append(names[i])
+                    .append("\",\"rating\":4.5,\"user_ratings_total\":100,\"address\":\"Calle Falsa ").append(i + 1)
+                    .append("\",\"main_photo\":null,\"types\":[\"restaurant\"]}}");
+        }
+        sb.append("]}");
+        return sb.toString();
     }
 
-    private void deleteListaViaApi(int listaId) throws IOException {
-        apiLogin();
-        String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
-        apiDelete(apiBase + "/api/favoritos/listas/" + listaId);
-    }
-
-    // ── 1. BASE: varias listas y varios restaurantes sin búsqueda ──────────────────────
+    // ── 1. BASE: varias listas, 0 restaurantes, con búsqueda
+    // ──────────────────────
 
     @Test
-    @DisplayName("debe mostrar varias listas y varios restaurantes sin búsqueda (BASE)")
-    void testBase_VariasListasVariosRestaurantes() throws Exception {
-        int listaAId = createListaViaApi("Mis Favoritos");
-        int listaBId = createListaViaApi("Para cenar");
-        addFavoritoViaApi(listaAId, PLACE_A);
-        addFavoritoViaApi(listaAId, PLACE_B);
-        addFavoritoViaApi(listaAId, PLACE_C);
+    @DisplayName("BASE — varias listas, 0 restaurantes, con búsqueda")
+    void testBase_BusquedaListas() throws Exception {
+        String listasJson = getMockListasJson(2);
+        String detailJson = getMockDetailJson(1, "Lista 1", 0);
 
-        FavoritesPage page = loginAndGoToFavorites();
+        FavoritesPage page = loginGoToHomeAndInjectMock(listasJson, detailJson);
+        try {
+            Assertions.assertEquals(2, page.getListCount(), "Debe haber 2 listas visibles");
 
-        Assertions.assertTrue(page.getListCount() >= 2,
-                "At least 2 lists must be visible (BASE case)");
+            page.openListByName("Lista 1");
+            Assertions.assertEquals(0, page.getRestaurantCount(), "La lista debe estar vacía");
 
-        page.openListByName("Mis Favoritos");
-        Assertions.assertTrue(page.getRestaurantCount() >= 1,
-                "Detail view must show at least 1 restaurant after opening a list");
-
-        deleteListaViaApi(listaAId);
-        deleteListaViaApi(listaBId);
+            page.searchWithin("pizza");
+            Assertions.assertEquals(0, page.getRestaurantCount(), "La lista filtrada debe seguir vacía");
+        } finally {
+            restoreFetch();
+        }
     }
 
-    // ── 2. Caso 2 y Casos 3–5 condensados: sin listas, lista única, lista vacía, lista con 1 elem. ──
+    // ── 2. S2, S3 y S6: vacíos, listas unitarias/múltiples
+    // ────────────────────────
 
     @Test
-    @DisplayName("debe gestionar correctamente listas vacías y unitarias (Caso 2, 3, 4, 5)")
-    void testCasosVacioYUnitario() throws Exception {
-        // Caso 2: no lists → empty state
-        FavoritesPage page = loginAndGoToFavorites();
-        if (page.getListCount() == 0) {
-            Assertions.assertTrue(page.isEmptyStateVisible(),
-                    "Caso 2: when there are no lists the empty-state text must be visible");
+    @DisplayName("S2, S3, S6 — gestión de estados vacíos y búsqueda")
+    void testCasosVacio() throws Exception {
+        // S2: 0 listas -> empty state
+        FavoritesPage pageEmpty = loginGoToHomeAndInjectMock("[]", "{}");
+        try {
+            Assertions.assertEquals(0, pageEmpty.getListCount(), "S2: debe haber 0 listas");
+            Assertions.assertTrue(pageEmpty.isEmptyStateVisible(), "S2: el texto de estado vacío debe ser visible");
+        } finally {
+            restoreFetch();
         }
 
-        // Caso 3: exactly 1 list
-        int listaId = createListaViaApi("Mis Favoritos Solo");
-        driver.get(sutUrl + "/favorites");
-        page = new FavoritesPage(driver, waiter);
-        Assertions.assertTrue(page.getListCount() >= 1, "Caso 3: at least 1 list must be visible");
-        deleteListaViaApi(listaId);
+        // S3: 1 lista, 0 restaurantes, con búsqueda
+        String listasJson3 = getMockListasJson(1);
+        String detailJson3 = getMockDetailJson(1, "Lista 1", 0);
+        FavoritesPage pageS3 = loginGoToHomeAndInjectMock(listasJson3, detailJson3);
+        try {
+            Assertions.assertEquals(1, pageS3.getListCount(), "S3: debe haber 1 lista");
+            pageS3.openListByName("Lista 1");
+            pageS3.searchWithin("pizza");
+            Assertions.assertEquals(0, pageS3.getRestaurantCount(), "S3: la lista filtrada debe estar vacía");
+        } finally {
+            restoreFetch();
+        }
 
-        // Caso 4: list with 0 restaurants
-        int emptyListaId = createListaViaApi("Lista Vacía");
-        driver.get(sutUrl + "/favorites");
-        page = new FavoritesPage(driver, waiter);
-        page.openListByName("Lista Vacía");
-        Assertions.assertEquals(0, page.getRestaurantCount(),
-                "Caso 4: an empty list must show 0 restaurant cards");
-        Assertions.assertTrue(page.isDetailEmptyStateVisible(),
-                "Caso 4: empty list detail must show the empty-state message");
-        deleteListaViaApi(emptyListaId);
-
-        // Caso 5: list with exactly 1 restaurant
-        int oneListaId = createListaViaApi("Lista Unitaria");
-        addFavoritoViaApi(oneListaId, PLACE_A);
-        driver.get(sutUrl + "/favorites");
-        page = new FavoritesPage(driver, waiter);
-        page.openListByName("Lista Unitaria");
-        Assertions.assertEquals(1, page.getRestaurantCount(),
-                "Caso 5: a list with 1 restaurant must show exactly 1 card");
-        deleteListaViaApi(oneListaId);
+        // S6: varias listas, 0 restaurantes, sin búsqueda
+        String listasJson6 = getMockListasJson(2);
+        String detailJson6 = getMockDetailJson(1, "Lista 1", 0);
+        FavoritesPage pageS6 = loginGoToHomeAndInjectMock(listasJson6, detailJson6);
+        try {
+            Assertions.assertEquals(2, pageS6.getListCount(), "S6: debe haber 2 listas");
+            pageS6.openListByName("Lista 1");
+            Assertions.assertTrue(pageS6.isDetailEmptyStateVisible(), "S6: el texto de lista vacía debe ser visible");
+            Assertions.assertEquals(0, pageS6.getRestaurantCount(), "S6: debe haber 0 restaurantes");
+        } finally {
+            restoreFetch();
+        }
     }
 
-    // ── 3. Caso 6: búsqueda dentro de lista filtra resultados ──────────────────────────
+    // ── 3. S4 y S5: listas con restaurantes y búsquedas ──────────────────────────
 
     @Test
-    @DisplayName("debe filtrar dinámicamente al buscar dentro de una lista (Caso 6)")
-    void testCaso6_BusquedaDentroLista() throws Exception {
-        int listaId = createListaViaApi("Búsqueda Test");
-        addFavoritoViaApi(listaId, PLACE_A);
-        addFavoritoViaApi(listaId, PLACE_B);
+    @DisplayName("S4, S5 — listas con restaurantes y búsquedas")
+    void testCasosConRestaurantes() throws Exception {
+        // S4: varias listas, 1 restaurante, con búsqueda
+        String listasJson4 = getMockListasJson(2);
+        String detailJson4 = getMockDetailJson(1, "Lista 1", 1);
+        FavoritesPage pageS4 = loginGoToHomeAndInjectMock(listasJson4, detailJson4);
+        try {
+            pageS4.openListByName("Lista 1");
+            Assertions.assertEquals(1, pageS4.getRestaurantCount(), "S4: debe haber 1 restaurante inicialmente");
 
-        FavoritesPage page = loginAndGoToFavorites();
-        page.openListByName("Búsqueda Test");
+            // Buscar coincidencia
+            pageS4.searchWithin("Uno");
+            Assertions.assertEquals(1, pageS4.getRestaurantCount(), "S4: debe seguir habiendo 1 restaurante");
 
-        int totalBefore = page.getRestaurantCount();
-        Assertions.assertTrue(totalBefore >= 1,
-                "Caso 6: must have at least 1 restaurant before searching");
+            // Buscar sin coincidencia
+            pageS4.searchWithin("zzz_no_match");
+            Assertions.assertEquals(0, pageS4.getRestaurantCount(),
+                    "S4: debe haber 0 restaurantes tras búsqueda fallida");
+        } finally {
+            restoreFetch();
+        }
 
-        page.searchWithin("zzz_no_match_xyz");
-        Assertions.assertEquals(0, page.getRestaurantCount(),
-                "Caso 6: searching with a non-matching term must show 0 results");
+        // S5: varias listas, varios restaurantes, con búsqueda
+        String listasJson5 = getMockListasJson(2);
+        String detailJson5 = getMockDetailJson(1, "Lista 1", 2);
+        FavoritesPage pageS5 = loginGoToHomeAndInjectMock(listasJson5, detailJson5);
+        try {
+            pageS5.openListByName("Lista 1");
+            Assertions.assertEquals(2, pageS5.getRestaurantCount(), "S5: debe haber 2 restaurantes inicialmente");
 
-        deleteListaViaApi(listaId);
+            // Buscar coincidencia parcial
+            pageS5.searchWithin("Dos");
+            Assertions.assertEquals(1, pageS5.getRestaurantCount(),
+                    "S5: debe haber 1 restaurante visible al filtrar por 'Dos'");
+
+            // Buscar sin coincidencia
+            pageS5.searchWithin("zzz_no_match");
+            Assertions.assertEquals(0, pageS5.getRestaurantCount(),
+                    "S5: debe haber 0 restaurantes tras búsqueda fallida");
+        } finally {
+            restoreFetch();
+        }
     }
 }

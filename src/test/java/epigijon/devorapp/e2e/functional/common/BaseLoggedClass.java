@@ -58,7 +58,8 @@ public class BaseLoggedClass {
     private static final SeleManager seleManager = new SeleManager(new SelemaConfig()
             .setReportSubdir("target/containerlogs/"
                     + (System.getProperty("TJOB_NAME") == null ? "" : System.getProperty("TJOB_NAME")))
-            .setName(System.getProperty("TJOB_NAME") == null ? "locallogs" : System.getProperty("TJOB_NAME")));
+            .setName(System.getProperty("TJOB_NAME") == null ? "locallogs" : System.getProperty("TJOB_NAME")))
+            .setManageAtClass();
 
     protected static String sutUrl;
     protected static Properties properties;
@@ -130,6 +131,9 @@ public class BaseLoggedClass {
      * all IndexedDB databases (where Firebase stores JWT tokens).
      */
     public void clearSession() {
+        try {
+            driver.get(sutUrl + "/vite.svg");
+        } catch (Exception ignored) {}
         try {
             driver.manage().deleteAllCookies();
         } catch (Exception ignored) {}

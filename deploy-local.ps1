@@ -112,12 +112,11 @@ if (Test-Path $dockerfilePath) {
 # Fix CRLF line endings in entrypoint.sh (Windows-safe patch for Docker)
 if (Test-Path $entrypointPath) {
     $content = [System.IO.File]::ReadAllText($entrypointPath)
-    if ($content.Contains("`r`n")) {
-        Write-Step "Fixing CRLF line endings in entrypoint.sh..."
-        $content = $content.Replace("`r`n", "`n")
-        [System.IO.File]::WriteAllText($entrypointPath, $content, [System.Text.Encoding]::UTF8)
-        Write-OK "Fixed CRLF line endings in entrypoint.sh"
-    }
+    Write-Step "Fixing line endings and BOM in entrypoint.sh..."
+    $content = $content.Replace("`r`n", "`n")
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($entrypointPath, $content, $utf8NoBom)
+    Write-OK "Fixed entrypoint.sh"
 }
 
 # ── External Docker network ─────────────────────────────────────────────────────
@@ -135,6 +134,18 @@ if ($existingNetworks -notcontains $NETWORK_NAME) {
 if (Test-Path "firebase-service-account.json") {
     Write-Step "Copying firebase-service-account.json from root to SUT backend folder..."
     Copy-Item "firebase-service-account.json" "$SUT_DIR/backend/" -Force
+}
+
+$frontendEnvSrc = "$SUT_DIR/frontend/.env"
+if (-not (Test-Path $frontendEnvSrc)) {
+    Write-Step "Creating frontend .env with build-time variables..."
+    @"
+VITE_API_URL=/api
+VITE_GOOGLE_CLIENT_ID=805247985045-qegp2ntfekphn6k497da3a2ejavdg0vt.apps.googleusercontent.com
+VITE_GOOGLE_API_KEY=$($env:GOOGLE_API_KEY)
+VITE_DISABLE_SSL=true
+"@ | Set-Content $frontendEnvSrc -Encoding UTF8
+    Write-OK "Created $frontendEnvSrc"
 }
 
 Write-Step "Building Docker images..."
