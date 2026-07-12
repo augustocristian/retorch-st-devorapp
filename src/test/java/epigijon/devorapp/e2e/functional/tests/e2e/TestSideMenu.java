@@ -35,9 +35,14 @@ class TestSideMenu extends BaseLoggedClass {
         tearDownTestUser();
     }
 
+    private void clearSessionAndLogin() {
+        clearSession();
+        driver.get(sutUrl + "/login");
+    }
+
     /** Logs in, navigates to /home, and opens the side menu. */
     private SideMenuPage loginAndOpenMenu() throws Exception {
-        driver.get(sutUrl + "/login");
+        clearSessionAndLogin();
         new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
                 .enterPassword(testPassword)

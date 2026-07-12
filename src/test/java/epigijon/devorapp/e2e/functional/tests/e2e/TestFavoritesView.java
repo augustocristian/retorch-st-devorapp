@@ -85,7 +85,10 @@ class TestFavoritesView extends BaseLoggedClass {
         injectFavoritesMock(listasJson, detailJson);
 
         new SideMenuPage(driver, waiter).open();
-        driver.findElement(By.xpath("//button[contains(.,'Favoritos')]")).click();
+        new org.openqa.selenium.support.ui.WebDriverWait(driver, java.time.Duration.ofSeconds(5))
+                .until(org.openqa.selenium.support.ui.ExpectedConditions.elementToBeClickable(
+                        By.xpath("//button[contains(.,'Favoritos')]")))
+                .click();
 
         return new FavoritesPage(driver, waiter);
     }
