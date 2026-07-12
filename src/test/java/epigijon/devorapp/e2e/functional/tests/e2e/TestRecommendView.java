@@ -90,13 +90,7 @@ class TestRecommendView extends BaseLoggedClass {
         injectAutocompleteMock();
         page.selectOtherLocation("Barcelona, España");
 
-        new WebDriverWait(driver, Duration.ofSeconds(10))
-                .until(d -> (Boolean) ((JavascriptExecutor) d).executeScript(
-                        "return window.mockAutocompleteInstance !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
-        ((JavascriptExecutor) driver).executeScript(
-                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        triggerAutocompletePlaceChanged();
 
         page.search();
         Assertions.assertFalse(page.hasErrorMessage(),

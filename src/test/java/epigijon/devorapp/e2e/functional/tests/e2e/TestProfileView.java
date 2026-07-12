@@ -49,17 +49,16 @@ class TestProfileView extends BaseLoggedClass {
     }
 
     /** Logs in and navigates to /profile. */
-    private ProfilePage loginAndGoToProfile() throws Exception {
+    private ProfilePage loginAndGoToProfile(String email, String password) throws Exception {
         clearSessionAndLogin();
         new LoginPage(driver, waiter)
-                .enterIdentifier(testEmail)
-                .enterPassword(testPassword)
+                .enterIdentifier(email)
+                .enterPassword(password)
                 .submitLogin();
         driver.get(sutUrl + "/profile");
         ProfilePage page = new ProfilePage(driver, waiter);
         waiter.waitUntil(ExpectedConditions.textToBePresentInElementLocated(
-                By.cssSelector(".location-info-card"), "UITester"),
-                "Profile data did not load (name 'UITester' not found)");
+                By.cssSelector(".location-info-card"), "UITester"), "Profile did not load");
         return page;
     }
 
@@ -75,15 +74,7 @@ class TestProfileView extends BaseLoggedClass {
         String localPassword = "Test1234!";
         registerUserApi(localUsername, localEmail, localPassword);
 
-        clearSessionAndLogin();
-        new LoginPage(driver, waiter)
-                .enterIdentifier(localEmail)
-                .enterPassword(localPassword)
-                .submitLogin();
-        driver.get(sutUrl + "/profile");
-        ProfilePage page = new ProfilePage(driver, waiter);
-        waiter.waitUntil(ExpectedConditions.textToBePresentInElementLocated(
-                By.cssSelector(".location-info-card"), "UITester"), "Profile did not load");
+        ProfilePage page = loginAndGoToProfile(localEmail, localPassword);
 
         // BASE: data is present
         String personalCardText = page.getCardText("Información Personal");
@@ -123,13 +114,7 @@ class TestProfileView extends BaseLoggedClass {
 
         // S4: Select location from autocomplete list (Ubicación = Bien)
         page.fillInputInCard("Ubicación Preferida", 0, "Barcelona, España");
-        new WebDriverWait(driver, Duration.ofSeconds(10))
-                .until(d -> (Boolean) ((JavascriptExecutor) d).executeScript(
-                        "return window.mockAutocompleteInstance !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
-        ((JavascriptExecutor) driver).executeScript(
-                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        triggerAutocompletePlaceChanged();
         page.clickButtonInCard("Ubicación Preferida", "Guardar cambios");
         waiter.waitForToast("success");
         Assertions.assertTrue(page.hasSuccessToast(), "S4: success toast must appear after updating location");
@@ -152,13 +137,7 @@ class TestProfileView extends BaseLoggedClass {
         String emailUserPassword = "Password123!";
         registerUserApi(emailUserUsername, emailUserEmail, emailUserPassword);
 
-        driver.get(sutUrl + "/login");
-        new LoginPage(driver, waiter)
-                .enterIdentifier(emailUserEmail)
-                .enterPassword(emailUserPassword)
-                .submitLogin();
-        driver.get(sutUrl + "/profile");
-        ProfilePage page = new ProfilePage(driver, waiter);
+        ProfilePage page = loginAndGoToProfile(emailUserEmail, emailUserPassword);
         page.openEmailChange();
 
         // S7 & S9: required attributes
@@ -202,13 +181,7 @@ class TestProfileView extends BaseLoggedClass {
         String passUserPassword = "Password123!";
         registerUserApi(passUserUsername, passUserEmail, passUserPassword);
 
-        driver.get(sutUrl + "/login");
-        new LoginPage(driver, waiter)
-                .enterIdentifier(passUserEmail)
-                .enterPassword(passUserPassword)
-                .submitLogin();
-        driver.get(sutUrl + "/profile");
-        page = new ProfilePage(driver, waiter);
+        page = loginAndGoToProfile(passUserEmail, passUserPassword);
         page.openPasswordChange();
 
         // S11 & S12: required attributes
@@ -261,14 +234,7 @@ class TestProfileView extends BaseLoggedClass {
 
         registerUserApi(delUsername, delEmail, delPassword);
 
-        driver.get(sutUrl + "/login");
-        new LoginPage(driver, waiter)
-                .enterIdentifier(delEmail)
-                .enterPassword(delPassword)
-                .submitLogin();
-        driver.get(sutUrl + "/profile");
-
-        ProfilePage page = new ProfilePage(driver, waiter);
+        ProfilePage page = loginAndGoToProfile(delEmail, delPassword);
         page.openDeleteAccount();
 
         Assertions.assertFalse(page.isDeleteButtonEnabled(),

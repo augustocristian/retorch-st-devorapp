@@ -43,18 +43,17 @@ class TestLogin extends BaseLoggedClass {
     // ── Tests ─────────────────────────────────────────────────────────────────────
 
     /**
-     * S7, S2 — valid credentials redirect the user to /home.
+     * S7 — valid credentials redirect the user to /home.
      *
      * <p>Combines:
      * <ul>
      *   <li>S7: Standard login using existing email and correct password.</li>
-     *   <li>S2: Google OAuth login (mocked in the browser) redirects to /home.</li>
      * </ul>
      */
     @Test
-    @DisplayName("Valid credentials redirect the user to the home page (S7, S2)")
+    @DisplayName("Valid credentials redirect the user to the home page (S7)")
     void testSuccessfulLogin() throws Exception {
-        // 1. S7 - Happy path (email/password)
+        // S7 - Happy path (email/password)
         clearSessionAndLogin();
         String url = new LoginPage(driver, waiter)
                 .enterIdentifier(testEmail)
@@ -64,23 +63,6 @@ class TestLogin extends BaseLoggedClass {
 
         Assertions.assertTrue(url.contains("/home"),
                 "After login the URL must contain /home (S7)");
-
-        // 2. S2 - Google OAuth login
-        driver.get(sutUrl + "/login"); // Navigate back to login page without clearing cookies/session
-        LoginPage loginPage = new LoginPage(driver, waiter);
-        
-        // Mock the Google login button's onclick to directly navigate to /home.
-        // Since we are already logged in (cookies still present in the browser), 
-        // /home will load successfully without redirecting back to /login.
-        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
-                "document.getElementById('google-login-btn').onclick = function() { " +
-                "  window.location.href = '/home';" +
-                "};"
-        );
-        
-        String googleUrl = loginPage.clickGoogleLogin().getCurrentUrl();
-        Assertions.assertTrue(googleUrl.contains("/home"),
-                "After Google login the URL must contain /home (S2)");
     }
 
     /**

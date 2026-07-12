@@ -32,17 +32,6 @@ class TestApiRegister extends BaseApiClass {
     // Password used for registration tests in this class
     private static final String PASSWORD = "Test1234!";
 
-    @BeforeAll
-    static void globalSetup() throws IOException {
-        // No shared user needed — each test creates its own
-        setupAll();
-    }
-
-    @AfterAll
-    static void globalTeardown() throws IOException {
-        tearDownAll();
-    }
-
     // ── BASE: registro exitoso devuelve HTTP 201 ──────────────────────────────
 
     @Test

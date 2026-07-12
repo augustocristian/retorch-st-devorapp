@@ -54,26 +54,6 @@ class TestHistoryView extends BaseLoggedClass {
         driver.get(sutUrl + "/login");
     }
 
-    /** Logs in and navigates to /history. */
-    private HistoryPage loginAndGoToHistory() throws Exception {
-        clearSessionAndLogin();
-        new LoginPage(driver, waiter)
-                .enterIdentifier(testEmail)
-                .enterPassword(testPassword)
-                .submitLogin();
-        driver.get(sutUrl + "/history");
-        return new HistoryPage(driver, waiter);
-    }
-
-    /** Adds a restaurant to history via the backend API. */
-    private void addHistorialEntry(String placeId) throws IOException {
-        apiLogin();
-        String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
-        JsonObject payload = new JsonObject();
-        payload.addProperty("place_id", placeId);
-        apiPost(apiBase + "/api/historial", payload.toString());
-    }
-
     private void injectHistorialMock(String jsonResponse) {
         ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
                 "window.originalFetch = window.fetch; " +

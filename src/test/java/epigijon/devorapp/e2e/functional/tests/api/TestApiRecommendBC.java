@@ -186,8 +186,8 @@ class TestApiRecommendBC extends BaseApiClass {
                 "Lugar inexistente 99999",
                 1);
 
-        String resp = post(recommendationsUrl("/search"), body);
-        // Accept any valid JSON response (200 with empty or 422 if location invalid)
-        Assertions.assertNotNull(resp, "Response must not be null even for 0 results (S10)");
+        int status = postStatus(recommendationsUrl("/search"), body);
+        Assertions.assertTrue(status == 200 || status == 422,
+                "Search must return 200 (or 422 for an invalid location), got: " + status);
     }
 }

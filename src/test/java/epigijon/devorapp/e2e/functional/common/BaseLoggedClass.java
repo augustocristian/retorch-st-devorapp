@@ -24,6 +24,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +76,7 @@ public class BaseLoggedClass {
     private static final java.util.Map<Class<?>, String> classEmails = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Map<Class<?>, String> classPasswords = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Map<Class<?>, String> classUsernames = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<Class<?>, java.util.List<String[]>> classRegisteredUsers = new java.util.concurrent.ConcurrentHashMap<>();
 
     protected String testUsername;
     protected String testEmail;
@@ -233,11 +236,22 @@ public class BaseLoggedClass {
     }
 
     /**
+     * Registers a username, email, and password created during a test so that they
+     * are cleaned up automatically in {@link #tearDownTestUser()}.
+     */
+    protected static void registerEmailForCleanup(String email, String password) {
+        Class<?> callingClass = getCallingClass();
+        classRegisteredUsers.computeIfAbsent(callingClass, k -> new java.util.concurrent.CopyOnWriteArrayList<>())
+                .add(new String[]{email, password});
+    }
+
+    /**
      * Registers a new test user via {@code POST /api/register} directly via the API client
      * without storing the credentials in the static maps (to prevent session pollution for other tests).
      */
     protected static void registerUserApi(String username, String email, String password)
             throws IOException {
+        registerEmailForCleanup(email, password);
         String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
         JsonObject payload = new JsonObject();
         payload.addProperty("username",  username);
@@ -258,7 +272,7 @@ public class BaseLoggedClass {
 
     /**
      * Logs in and then calls {@code DELETE /api/profile} to permanently remove
-     * the test user created by {@link #setupTestUser}.
+     * the test user created by {@link #setupTestUser} as well as any extra users registered during the test.
      * Call from a subclass {@code @AfterAll} — the parent {@code @AfterAll}
      * ({@link #tearDownAll}) which closes the API client runs after this.
      */
@@ -266,6 +280,39 @@ public class BaseLoggedClass {
         Class<?> callingClass = getCallingClass();
         String email = classEmails.get(callingClass);
         String password = classPasswords.get(callingClass);
+
+        // Delete any extra registered users tracked for this class
+        java.util.List<String[]> extraUsers = classRegisteredUsers.get(callingClass);
+        if (extraUsers != null && apiClient != null) {
+            for (String[] user : extraUsers) {
+                String extraEmail = user[0];
+                String extraPassword = user[1];
+                try {
+                    String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
+
+                    JsonObject loginPayload = new JsonObject();
+                    loginPayload.addProperty("identifier", extraEmail);
+                    loginPayload.addProperty("password",   extraPassword);
+                    HttpPost login = new HttpPost(apiBase + "/api/login");
+                    login.setEntity(new StringEntity(loginPayload.toString(), ContentType.APPLICATION_JSON));
+                    login.addHeader("Accept", "application/json");
+                    try (CloseableHttpResponse resp = apiClient.execute(login)) {
+                        EntityUtils.consume(resp.getEntity());
+                    }
+
+                    URIBuilder ub = new URIBuilder(apiBase + "/api/profile");
+                    ub.addParameter("password", extraPassword);
+                    try (CloseableHttpResponse resp = apiClient.execute(new HttpDelete(ub.build()))) {
+                        EntityUtils.consume(resp.getEntity());
+                    }
+                    log.info("Deleted extra registered test user: {}", extraEmail);
+                } catch (Exception e) {
+                    log.warn("Could not delete extra registered test user {}: {}", extraEmail, e.getMessage());
+                }
+            }
+            classRegisteredUsers.remove(callingClass);
+        }
+
         if (email == null || password == null || apiClient == null) return;
         try {
             String apiBase = properties.getProperty("LOCALHOST_URL", "http://localhost:8000");
@@ -343,7 +390,7 @@ public class BaseLoggedClass {
 
     /** Injects a bulletproof Google Maps Autocomplete mock into the window object. */
     protected void injectAutocompleteMock() {
-        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
+        ((JavascriptExecutor) driver).executeScript(
                 "const mockAutocompleteClass = class {\n" +
                 "  constructor(input, options) {\n" +
                 "    window.mockAutocompleteInstance = this;\n" +
@@ -376,6 +423,18 @@ public class BaseLoggedClass {
                 "Object.defineProperty(mockGoogle, 'maps', { value: mockMaps, writable: false, configurable: false });\n" +
                 "Object.defineProperty(window, 'google', { value: mockGoogle, writable: false, configurable: false });\n"
         );
+    }
+
+    /**
+     * Waits for the mock Autocomplete instance to be initialized and have a 'place_changed'
+     * listener, then triggers all the 'place_changed' callbacks.
+     */
+    protected void triggerAutocompletePlaceChanged() {
+        new WebDriverWait(driver, Duration.ofSeconds(10)).until(d ->
+            (Boolean) ((JavascriptExecutor) d).executeScript(
+                "return window.mockAutocompleteInstance?.listeners?.['place_changed'] !== undefined;"));
+        ((JavascriptExecutor) driver).executeScript(
+            "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
     }
 }
 

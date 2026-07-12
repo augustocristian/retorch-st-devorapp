@@ -117,10 +117,10 @@ class TestFavoritesView extends BaseLoggedClass {
                 sb.append(",");
             sb.append("{\"id\":").append(i + 1)
                     .append(",\"lista_id\":").append(listId)
-                    .append(",\"place_id\":\"").append(placeIds[i])
+                    .append(",\"place_id\":\"").append(placeIds[i % placeIds.length])
                     .append("\",\"restaurant\":{")
-                    .append("\"id\":\"").append(placeIds[i])
-                    .append("\",\"name\":\"").append(names[i])
+                    .append("\"id\":\"").append(placeIds[i % placeIds.length])
+                    .append("\",\"name\":\"").append(names[i % names.length])
                     .append("\",\"rating\":4.5,\"user_ratings_total\":100,\"address\":\"Calle Falsa ").append(i + 1)
                     .append("\",\"main_photo\":null,\"types\":[\"restaurant\"]}}");
         }

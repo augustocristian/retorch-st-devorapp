@@ -3,6 +3,17 @@ package epigijon.devorapp.e2e.functional.tests.api;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import epigijon.devorapp.e2e.functional.common.BaseApiClass;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -10,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 
 /**
  * API Base-Choice tests for the history (historial) module.
@@ -66,14 +78,53 @@ class TestApiHistorialBC extends BaseApiClass {
         long ts = unique();
         String email    = uniqueEmail(ts);
         String username = uniqueUsername(ts);
+        String password = "Test1234!";
 
-        postStatus(authUrl("/register"),
-                registerPayload(username, email, "Test1234!", "Test", "User", ""));
-        postStatus(authUrl("/login"), loginPayload(email, "Test1234!"));
+        BasicCookieStore localCookieStore = new BasicCookieStore();
+        try (CloseableHttpClient localClient = HttpClients.custom().setDefaultCookieStore(localCookieStore).build()) {
+            // Register using local client
+            HttpPost registerReq = new HttpPost(authUrl("/register"));
+            registerReq.setEntity(new StringEntity(
+                    registerPayload(username, email, password, "Test", "User", ""),
+                    ContentType.APPLICATION_JSON));
+            registerReq.addHeader("Accept", "application/json");
+            try (CloseableHttpResponse response = localClient.execute(registerReq)) {
+                EntityUtils.consume(response.getEntity());
+            }
 
-        JsonArray historial = getJsonArray(historialUrl(""));
-        // Cannot guarantee 0 if test runs after other tests on same user; check it's an array
-        Assertions.assertNotNull(historial, "GET historial must return a JSON array");
+            // Login using local client to populate localCookieStore
+            HttpPost loginReq = new HttpPost(authUrl("/login"));
+            loginReq.setEntity(new StringEntity(
+                    loginPayload(email, password),
+                    ContentType.APPLICATION_JSON));
+            loginReq.addHeader("Accept", "application/json");
+            try (CloseableHttpResponse response = localClient.execute(loginReq)) {
+                EntityUtils.consume(response.getEntity());
+            }
+
+            // GET /api/historial using local client
+            String body;
+            HttpGet getReq = new HttpGet(historialUrl(""));
+            getReq.addHeader("Accept", "application/json");
+            try (CloseableHttpResponse response = localClient.execute(getReq)) {
+                org.apache.http.HttpEntity entity = response.getEntity();
+                body = entity != null ? EntityUtils.toString(entity) : "";
+            }
+            JsonArray historial = com.google.gson.JsonParser.parseString(body).getAsJsonArray();
+            Assertions.assertTrue(historial.isEmpty(), "A brand-new user must have an empty history");
+
+            // Clean up: delete fresh user to prevent leaks
+            try {
+                URIBuilder builder = new URIBuilder(authUrl("/profile"));
+                builder.addParameter("password", password);
+                HttpDelete deleteReq = new HttpDelete(builder.build());
+                try (CloseableHttpResponse response = localClient.execute(deleteReq)) {
+                    EntityUtils.consume(response.getEntity());
+                }
+            } catch (URISyntaxException e) {
+                // Ignore
+            }
+        }
     }
 
     // ── Caso 5: exactamente 1 entrada ────────────────────────────────────────

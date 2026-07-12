@@ -62,10 +62,14 @@ class TestRegisterView extends BaseLoggedClass {
         RegisterPage reg = new RegisterPage(driver, waiter);
 
         long ts = System.currentTimeMillis();
+        String email = "regbase" + ts + "@devorapp.test";
+        String password = BASE_PASSWORD;
+        registerEmailForCleanup(email, password);
+
         fillStep1(reg,
-                "regbase" + ts + "@devorapp.test",
+                email,
                 "regbase" + (ts % 100000),
-                BASE_PASSWORD, BASE_NOMBRE, BASE_APELLIDOS);
+                password, BASE_NOMBRE, BASE_APELLIDOS);
         injectAutocompleteMock(); // inject BEFORE step 2 mounts so the component finds window.google immediately
         reg.clickContinue().waitForStep2();
 
@@ -73,14 +77,7 @@ class TestRegisterView extends BaseLoggedClass {
 
         reg.enterUbicacion("Madrid, España");
 
-        new WebDriverWait(driver, Duration.ofSeconds(10))
-                .until(d -> (Boolean) ((org.openqa.selenium.JavascriptExecutor) d).executeScript(
-                        "return window.mockAutocompleteInstance !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
-
-        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
-                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        triggerAutocompletePlaceChanged();
 
         reg.clickSubmit();
 
@@ -232,13 +229,7 @@ class TestRegisterView extends BaseLoggedClass {
         injectAutocompleteMock(); // inject BEFORE step 2 mounts so the component finds window.google immediately
         reg.clickContinue().waitForStep2();
         reg.enterUbicacion("Gijón, España");
-        new WebDriverWait(driver, Duration.ofSeconds(10))
-                .until(d -> (Boolean) ((org.openqa.selenium.JavascriptExecutor) d).executeScript(
-                        "return window.mockAutocompleteInstance !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
-        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
-                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        triggerAutocompletePlaceChanged();
         reg.clickSubmit();
         String errS13 = getErrorMessageWithWait(reg);
         Assertions.assertTrue(errS13.toLowerCase().contains("letra") ||
@@ -253,13 +244,7 @@ class TestRegisterView extends BaseLoggedClass {
         injectAutocompleteMock(); // inject BEFORE step 2 mounts
         reg.clickContinue().waitForStep2();
         reg.enterUbicacion("Gijón, España");
-        new WebDriverWait(driver, Duration.ofSeconds(10))
-                .until(d -> (Boolean) ((org.openqa.selenium.JavascriptExecutor) d).executeScript(
-                        "return window.mockAutocompleteInstance !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
-        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
-                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        triggerAutocompletePlaceChanged();
         reg.clickSubmit();
         String errS12 = getErrorMessageWithWait(reg);
         Assertions.assertTrue(errS12.toLowerCase().contains("número") ||
@@ -272,23 +257,21 @@ class TestRegisterView extends BaseLoggedClass {
         driver.get(sutUrl + "/register");
         reg = new RegisterPage(driver, waiter);
         long ts2 = System.currentTimeMillis();
+        String emailS11 = "reglong" + ts2 + "@devorapp.test";
+        String passwordS11 = "Segura1234567890";
+        registerEmailForCleanup(emailS11, passwordS11);
+
         fillStep1(reg,
-                "reglong" + ts2 + "@devorapp.test",
+                emailS11,
                 "reglong" + (ts2 % 100000),
-                "Segura1234567890", BASE_NOMBRE, BASE_APELLIDOS);
+                passwordS11, BASE_NOMBRE, BASE_APELLIDOS);
         injectAutocompleteMock(); // inject BEFORE step 2 mounts so the component finds window.google immediately
         reg.clickContinue().waitForStep2();
 
         Assertions.assertTrue(reg.isOnStep2(), "S11: must advance to step 2");
 
         reg.enterUbicacion("Madrid, España");
-        new WebDriverWait(driver, Duration.ofSeconds(10))
-                .until(d -> (Boolean) ((org.openqa.selenium.JavascriptExecutor) d).executeScript(
-                        "return window.mockAutocompleteInstance !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners !== undefined && " +
-                        "window.mockAutocompleteInstance.listeners['place_changed'] !== undefined;"));
-        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(
-                "window.mockAutocompleteInstance.listeners['place_changed'].forEach(cb => cb());");
+        triggerAutocompletePlaceChanged();
         reg.clickSubmit();
 
         final RegisterPage finalRegS11 = reg;
