@@ -70,23 +70,53 @@ if (-not (Test-Path $SUT_DIR)) {
     git clone $SUT_REPO $SUT_DIR
     if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to clone '$SUT_REPO'." }
     Write-OK "Cloned SUT."
-
-    Write-Step "Patching SUT for test environment (SKIP_EMAIL_VERIFICATION)..."
-    $configPath = "$SUT_DIR/backend/app/core/config.py"
-    $authPath   = "$SUT_DIR/backend/app/services/auth_service.py"
-
-    # Add SKIP_EMAIL_VERIFICATION field to Settings
-    (Get-Content $configPath) -replace '(    # JWT)', "    # Test helpers`n    SKIP_EMAIL_VERIFICATION: bool = False`n`n`$1" |
-        Set-Content $configPath
-    Write-OK "Patched config.py"
-
-    # Guard the email-verified check with the new setting
-    (Get-Content $authPath) -replace 'if not user_record\.email_verified:',
-        'if not settings.SKIP_EMAIL_VERIFICATION and not user_record.email_verified:' |
-        Set-Content $authPath
-    Write-OK "Patched auth_service.py"
 } else {
     Write-OK "'$SUT_DIR' already present, skipping clone."
+}
+
+# ── Patch SUT if needed ─────────────────────────────────────────────────────────
+Write-Step "Checking SUT patches..."
+$configPath = "$SUT_DIR/backend/app/core/config.py"
+$authPath   = "$SUT_DIR/backend/app/services/auth_service.py"
+$dockerfilePath = "$SUT_DIR/backend/Dockerfile"
+$entrypointPath = "$SUT_DIR/backend/entrypoint.sh"
+
+if (Test-Path $configPath) {
+    if ((Get-Content $configPath -Raw) -notmatch "SKIP_EMAIL_VERIFICATION") {
+        Write-Step "Patching config.py..."
+        (Get-Content $configPath) -replace '(    # JWT)', "    # Test helpers`n    SKIP_EMAIL_VERIFICATION: bool = False`n`n`$1" |
+            Set-Content $configPath
+        Write-OK "Patched config.py"
+    }
+}
+
+if (Test-Path $authPath) {
+    if ((Get-Content $authPath -Raw) -notmatch "SKIP_EMAIL_VERIFICATION") {
+        Write-Step "Patching auth_service.py..."
+        (Get-Content $authPath) -replace 'if not user_record\.email_verified:',
+            'if not settings.SKIP_EMAIL_VERIFICATION and not user_record.email_verified:' |
+            Set-Content $authPath
+        Write-OK "Patched auth_service.py"
+    }
+}
+
+if (Test-Path $dockerfilePath) {
+    if ((Get-Content $dockerfilePath -Raw) -notmatch "firebase-service-account.json") {
+        Write-Step "Patching Dockerfile..."
+        (Get-Content $dockerfilePath) -replace 'COPY entrypoint.sh \./entrypoint.sh', "COPY entrypoint.sh ./entrypoint.sh`nCOPY firebase-service-account.json* ./" |
+            Set-Content $dockerfilePath
+        Write-OK "Patched Dockerfile"
+    }
+}
+
+# Fix CRLF line endings in entrypoint.sh (Windows-safe patch for Docker)
+if (Test-Path $entrypointPath) {
+    $content = [System.IO.File]::ReadAllText($entrypointPath)
+    Write-Step "Fixing line endings and BOM in entrypoint.sh..."
+    $content = $content.Replace("`r`n", "`n")
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($entrypointPath, $content, $utf8NoBom)
+    Write-OK "Fixed entrypoint.sh"
 }
 
 # ── External Docker network ─────────────────────────────────────────────────────
@@ -101,8 +131,25 @@ if ($existingNetworks -notcontains $NETWORK_NAME) {
 }
 
 # ── Build images ────────────────────────────────────────────────────────────────
+if (Test-Path "firebase-service-account.json") {
+    Write-Step "Copying firebase-service-account.json from root to SUT backend folder..."
+    Copy-Item "firebase-service-account.json" "$SUT_DIR/backend/" -Force
+}
+
+$frontendEnvSrc = "$SUT_DIR/frontend/.env"
+if (-not (Test-Path $frontendEnvSrc)) {
+    Write-Step "Creating frontend .env with build-time variables..."
+    @"
+VITE_API_URL=/api
+VITE_GOOGLE_CLIENT_ID=805247985045-qegp2ntfekphn6k497da3a2ejavdg0vt.apps.googleusercontent.com
+VITE_GOOGLE_API_KEY=$($env:GOOGLE_API_KEY)
+VITE_DISABLE_SSL=true
+"@ | Set-Content $frontendEnvSrc -Encoding UTF8
+    Write-OK "Created $frontendEnvSrc"
+}
+
 Write-Step "Building Docker images..."
-docker compose -f $COMPOSE_FILE --env-file $ENV_FILE --ansi never build
+docker compose -f $COMPOSE_FILE --env-file $ENV_FILE --ansi never -p $TJOB_NAME build
 if ($LASTEXITCODE -ne 0) { Write-Fail "docker compose build failed." }
 Write-OK "Images built."
 

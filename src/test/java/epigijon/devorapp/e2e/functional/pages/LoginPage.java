@@ -15,6 +15,7 @@ public class LoginPage extends BasePage {
     private static final By IDENTIFIER    = By.id("identifier");
     private static final By PASSWORD      = By.id("password");
     private static final By SUBMIT        = By.id("login-submit-btn");
+    private static final By GOOGLE_BTN    = By.id("google-login-btn");
     private static final By REGISTER_LINK = By.id("go-register-link");
     private static final By ERROR_MSG     = By.cssSelector(".message.error");
 
@@ -58,6 +59,12 @@ public class LoginPage extends BasePage {
     public RegisterPage goToRegister() throws ElementNotFoundException {
         click(REGISTER_LINK);
         return new RegisterPage(driver, waiter);
+    }
+    
+    /** Clicks the Google login button. */
+    public HomePage clickGoogleLogin() throws ElementNotFoundException {
+        click(GOOGLE_BTN);
+        return new HomePage(driver, waiter);
     }
 
     /** Returns {@code true} if an error message is currently visible. */

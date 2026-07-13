@@ -66,20 +66,32 @@ if [[ ! -d "$SUT_DIR" ]]; then
     step "Cloning $SUT_REPO into '$SUT_DIR'..."
     git clone "$SUT_REPO" "$SUT_DIR"
     ok "Cloned SUT."
-
-    step "Patching SUT for test environment (SKIP_EMAIL_VERIFICATION)..."
-    CONFIG="$SUT_DIR/backend/app/core/config.py"
-    AUTH="$SUT_DIR/backend/app/services/auth_service.py"
-
-    # Add SKIP_EMAIL_VERIFICATION field to Settings (before the JWT section)
-    sed -i 's/    # JWT/    # Test helpers\n    SKIP_EMAIL_VERIFICATION: bool = False\n\n    # JWT/' "$CONFIG"
-    ok "Patched config.py"
-
-    # Guard the email-verified check with the new setting
-    sed -i 's/if not user_record\.email_verified:/if not settings.SKIP_EMAIL_VERIFICATION and not user_record.email_verified:/' "$AUTH"
-    ok "Patched auth_service.py"
 else
     ok "'$SUT_DIR' already present, skipping clone."
+fi
+
+# ── Patch SUT if needed ──────────────────────────────────────────────────────────
+step "Checking SUT patches..."
+CONFIG="$SUT_DIR/backend/app/core/config.py"
+AUTH="$SUT_DIR/backend/app/services/auth_service.py"
+DOCKERFILE="$SUT_DIR/backend/Dockerfile"
+
+if [[ -f "$CONFIG" ]] && ! grep -q "SKIP_EMAIL_VERIFICATION" "$CONFIG"; then
+    step "Patching config.py..."
+    sed -i 's/    # JWT/    # Test helpers\n    SKIP_EMAIL_VERIFICATION: bool = False\n\n    # JWT/' "$CONFIG"
+    ok "Patched config.py"
+fi
+
+if [[ -f "$AUTH" ]] && ! grep -q "SKIP_EMAIL_VERIFICATION" "$AUTH"; then
+    step "Patching auth_service.py..."
+    sed -i 's/if not user_record\.email_verified:/if not settings.SKIP_EMAIL_VERIFICATION and not user_record.email_verified:/' "$AUTH"
+    ok "Patched auth_service.py"
+fi
+
+if [[ -f "$DOCKERFILE" ]] && ! grep -q "firebase-service-account.json" "$DOCKERFILE"; then
+    step "Patching Dockerfile..."
+    sed -i 's/COPY entrypoint.sh .\/entrypoint.sh/COPY entrypoint.sh .\/entrypoint.sh\nCOPY firebase-service-account.json\* .\//' "$DOCKERFILE"
+    ok "Patched Dockerfile"
 fi
 
 # ── External Docker network ──────────────────────────────────────────────────────
@@ -92,8 +104,13 @@ else
 fi
 
 # ── Build images ─────────────────────────────────────────────────────────────────
+if [[ -f "firebase-service-account.json" ]]; then
+    step "Copying firebase-service-account.json from root to SUT backend folder..."
+    cp "firebase-service-account.json" "$SUT_DIR/backend/"
+fi
+
 step "Building Docker images..."
-docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --ansi never build
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --ansi never -p "$TJOB_NAME" build
 ok "Images built."
 
 # ── Start containers ─────────────────────────────────────────────────────────────

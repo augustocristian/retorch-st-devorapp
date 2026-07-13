@@ -49,7 +49,7 @@ public class BaseApiClass {
     protected static String testPassword;
 
     @BeforeAll
-    static void setupAll() throws IOException {
+    public static void setupAll() throws IOException {
         log.info("Starting API test global setup");
         properties = new Properties();
         properties.load(Files.newInputStream(Paths.get("src/test/resources/test.properties")));
@@ -64,7 +64,7 @@ public class BaseApiClass {
     }
 
     @AfterAll
-    static void tearDownAll() throws IOException {
+    public static void tearDownAll() throws IOException {
         if (httpClient != null) {
             httpClient.close();
             log.info("Shared HTTP client closed");
@@ -85,11 +85,12 @@ public class BaseApiClass {
     protected String get(String url) throws IOException {
         HttpGet request = new HttpGet(url);
         request.addHeader("Accept", "application/json");
-        HttpResponse response = httpClient.execute(request);
-        HttpEntity entity = response.getEntity();
-        String body = entity != null ? EntityUtils.toString(entity) : "";
-        log.debug("GET {} -> {}", url, response.getStatusLine().getStatusCode());
-        return body;
+        try (CloseableHttpResponse response = httpClient.execute(request)) {
+            HttpEntity entity = response.getEntity();
+            String body = entity != null ? EntityUtils.toString(entity) : "";
+            log.debug("GET {} -> {}", url, response.getStatusLine().getStatusCode());
+            return body;
+        }
     }
 
     protected int getStatus(String url) throws IOException {
@@ -97,11 +98,12 @@ public class BaseApiClass {
     }
 
     protected String post(String url, String jsonBody) throws IOException {
-        HttpResponse response = httpClient.execute(buildPost(url, jsonBody));
-        HttpEntity entity = response.getEntity();
-        String body = entity != null ? EntityUtils.toString(entity) : "";
-        log.debug("POST {} -> {}", url, response.getStatusLine().getStatusCode());
-        return body;
+        try (CloseableHttpResponse response = httpClient.execute(buildPost(url, jsonBody))) {
+            HttpEntity entity = response.getEntity();
+            String body = entity != null ? EntityUtils.toString(entity) : "";
+            log.debug("POST {} -> {}", url, response.getStatusLine().getStatusCode());
+            return body;
+        }
     }
 
     protected int postStatus(String url, String jsonBody) throws IOException {
@@ -156,9 +158,12 @@ public class BaseApiClass {
     }
 
     private int statusOf(HttpUriRequest request) throws IOException {
-        int status = httpClient.execute(request).getStatusLine().getStatusCode();
-        log.debug("{} {} -> {}", request.getMethod(), request.getURI(), status);
-        return status;
+        try (CloseableHttpResponse response = httpClient.execute(request)) {
+            int status = response.getStatusLine().getStatusCode();
+            log.debug("{} {} -> {}", request.getMethod(), request.getURI(), status);
+            EntityUtils.consume(response.getEntity());
+            return status;
+        }
     }
 
     // ── Uniqueness helpers ───────────────────────────────────────────────────────
@@ -206,8 +211,10 @@ public class BaseApiClass {
             URIBuilder builder = new URIBuilder(authUrl_s() + "/profile");
             builder.addParameter("password", testPassword);
             HttpDelete request = new HttpDelete(builder.build());
-            int status = httpClient.execute(request).getStatusLine().getStatusCode();
-            log.info("Deleted test user {} -> HTTP {}", testEmail, status);
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                int status = response.getStatusLine().getStatusCode();
+                log.info("Deleted test user {} -> HTTP {}", testEmail, status);
+            }
         } catch (Exception e) {
             log.warn("Could not delete test user {}: {}", testEmail, e.getMessage());
         }
@@ -223,9 +230,10 @@ public class BaseApiClass {
         HttpPost request = new HttpPost(url);
         request.setEntity(new StringEntity(jsonBody, ContentType.APPLICATION_JSON));
         request.addHeader("Accept", "application/json");
-        HttpResponse response = httpClient.execute(request);
-        HttpEntity entity = response.getEntity();
-        return entity != null ? EntityUtils.toString(entity) : "";
+        try (CloseableHttpResponse response = httpClient.execute(request)) {
+            HttpEntity entity = response.getEntity();
+            return entity != null ? EntityUtils.toString(entity) : "";
+        }
     }
 
     // ── Payload builders ─────────────────────────────────────────────────────────

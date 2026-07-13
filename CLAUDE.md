@@ -82,19 +82,23 @@ retorch-st-devorapp/
 │   │   ├── RegisterPage.java              /register — readiness check
 │   │   └── HomePage.java                  /home — top-bar visibility, current URL
 │   ├── tests/
-│   │   ├── api/                           Single-endpoint API tests
-│   │   │   ├── TestApiAuth.java             Health, welcome, availability, me, profile update
-│   │   │   ├── TestApiListas.java           Favorites list CRUD
-│   │   │   ├── TestApiFavoritos.java        Favorites restaurant CRUD
+│   │   ├── api/                           Single-endpoint API tests (Base-Choice)
+│   │   │   ├── TestApiFavoritosBC.java      Favorites restaurant and list CRUD
+│   │   │   ├── TestApiHistorialBC.java      History CRUD + popular places
 │   │   │   ├── TestApiMasTarde.java         Save-for-later CRUD
-│   │   │   ├── TestApiValoraciones.java     Ratings CRUD
-│   │   │   └── TestApiHistorial.java        History CRUD + popular places
-│   │   └── e2e/                           Multi-step workflow tests + browser tests
-│   │       ├── TestSearchRestaurant.java    Search → add result to historial
-│   │       ├── TestAddRestaurantToFavorites.java  Full favorites workflow
-│   │       ├── TestEvaluateRestaurant.java  Full rating lifecycle
-│   │       ├── TestLogin.java               Browser: login form, error handling, register link
-│   │       └── TestHome.java                Browser: home page after login
+│   │   │   ├── TestApiProfileBC.java        Profile update BC
+│   │   │   ├── TestApiRecommendBC.java      Google Places recommendations BC
+│   │   │   ├── TestApiRegister.java         User registration and login BC
+│   │   │   └── TestApiValoracionesBC.java   Ratings CRUD and likes BC
+│   │   └── e2e/                           Browser E2E workflow tests (Selenium)
+│   │       ├── TestFavoritesView.java       Browser: favorites lists and card views
+│   │       ├── TestHistoryView.java         Browser: history page, month grouping, search
+│   │       ├── TestLogin.java               Browser: login page form and links
+│   │       ├── TestProfileView.java         Browser: profile fields and email/password update
+│   │       ├── TestRatingView.java          Browser: rating modal and aspect stars
+│   │       ├── TestRecommendView.java       Browser: recommendation page filters
+│   │       ├── TestRegisterView.java        Browser: user register page multi-step form
+│   │       └── TestSideMenu.java            Browser: dark theme and font sizes in side drawer
 │   └── utils/
 │       ├── Click.java                     Safe click (native then JS fallback)
 │       └── Waiter.java                    Explicit-wait conditions for each page
@@ -120,7 +124,7 @@ retorch-st-devorapp/
 | `common` | Shared base classes | `BaseApiClass`, `BaseLoggedClass` |
 | `pages` | Page Object Model — encapsulates all DOM interaction | `BasePage`, `LoginPage`, `RegisterPage`, `HomePage` |
 | `tests.api` | One endpoint, one concern per test | `TestApi*` |
-| `tests.e2e` | Multi-step user journeys + browser tests | `TestSearch*`, `TestAdd*`, `TestEvaluate*`, `TestLogin`, `TestHome` |
+| `tests.e2e` | Browser E2E workflow tests (Selenium) | `TestFavoritesView`, `TestHistoryView`, `TestLogin`, `TestProfileView`, `TestRatingView`, `TestRecommendView`, `TestRegisterView`, `TestSideMenu` |
 | `utils` | Low-level Selenium helpers used by page objects | `Click`, `Waiter` |
 
 ---
@@ -190,8 +194,8 @@ GOOGLE_API_KEY=<your-key>
 SECRET_KEY=<your-jwt-secret>
 ```
 
-### `devorapp/backend/firebase-service-account.json`
-Place in `devorapp/backend/` after cloning. Never committed.
+### `firebase-service-account.json`
+Can be placed in the repository root or in `devorapp/backend/` (never committed). The deploy scripts (`deploy-local.sh` and `deploy-local.ps1`) automatically copy it from the root to `devorapp/backend/` before compiling the images, patch the SUT's backend `Dockerfile` to copy it during the build process, and compile it.
 
 ---
 
@@ -224,11 +228,13 @@ The scripts:
 
 ```bash
 mvn test                          # full suite
-mvn test -Dtest=TestApiAuth       # single API class
 mvn test -Dtest=TestLogin         # single browser class
+mvn test -Dheadless=true          # run browser tests headlessly
 # CI
 mvn test -DSUT_URL=http://backend:8000 -DTJOB_NAME=tjob1
 ```
+
+> **Tutor's Examples:** The tutor's original example test classes (e.g. `TestEvaluateRestaurant`, `TestApiAuth`, etc.) have been deleted as they are redundant. Only the API test `TestApiMasTarde` was kept and enabled to ensure coverage of the save-for-later endpoints.
 
 Reports → `target/local/surefire-reports/`
 

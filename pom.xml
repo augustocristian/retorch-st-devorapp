@@ -30,8 +30,6 @@
 
 		<selema.version>4.0.2</selema.version>
 
-		<retorch-tool.version>1.2.0</retorch-tool.version>
-
 		<!-- Prevents "undefined property" warning when JaCoCo is not active -->
 		<surefireArgLine></surefireArgLine>
 
@@ -70,16 +68,6 @@
 			<groupId>io.github.javiertuya</groupId>
 			<artifactId>selema</artifactId>
 			<version>${selema.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.github.giis-uniovi</groupId>
-			<artifactId>retorch-annotations</artifactId>
-			<version>${retorch-tool.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.github.giis-uniovi</groupId>
-			<artifactId>retorch-orchestration</artifactId>
-			<version>${retorch-tool.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.httpcomponents</groupId>

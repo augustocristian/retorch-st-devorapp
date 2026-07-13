@@ -11,3 +11,8 @@ org.sonarlint.eclipse.core.prefs
 
 # Cloned sut
 /devorapp
+
+# Firebase service account
+firebase-service-account.json
+
+local.env
